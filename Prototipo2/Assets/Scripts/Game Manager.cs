@@ -1,6 +1,7 @@
 using System.Collections;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.TextCore.Text;
 
 public class GameManager : MonoBehaviour
 {
@@ -32,13 +33,13 @@ public class GameManager : MonoBehaviour
 
         // Reset character position
         characterPos = new Vector2Int(0, -1);
-        character.position = new Vector3(0, 0.2f, -1);
+        character.position = new Vector3(0, 0.0f, -1);
     }
 
     private bool InStartArea(Vector2Int location)
     {
         // Movement anywhere in the starting region is allowed.
-        if ((location.y > -5) && (location.y < 0) && (location.x > -6) && (location.x < 6))
+        if ((location.x > -6) && (location.x < 6))
         {
             return true;
         }
@@ -53,22 +54,22 @@ public class GameManager : MonoBehaviour
         {
             Vector2Int moveDirection = Vector2Int.zero;
             // Single if/else don't want to move diagonally.
-            if (Keyboard.current.upArrowKey.wasPressedThisFrame)
+            if (Keyboard.current.upArrowKey.wasPressedThisFrame || Keyboard.current.wKey.wasPressedThisFrame)
             {
                 character.localRotation = Quaternion.identity;
                 moveDirection.y = 1;
             }
-            else if (Keyboard.current.downArrowKey.wasPressedThisFrame)
+            else if (Keyboard.current.downArrowKey.wasPressedThisFrame || Keyboard.current.sKey.wasPressedThisFrame)
             {
                 character.localRotation = Quaternion.Euler(0, 180, 0);
                 moveDirection.y = -1;
             }
-            else if (Keyboard.current.leftArrowKey.wasPressedThisFrame)
+            else if (Keyboard.current.leftArrowKey.wasPressedThisFrame || Keyboard.current.aKey.wasPressedThisFrame)
             {
                 character.localRotation = Quaternion.Euler(0, -90, 0);
                 moveDirection.x = -1;
             }
-            else if (Keyboard.current.rightArrowKey.wasPressedThisFrame)
+            else if (Keyboard.current.rightArrowKey.wasPressedThisFrame || Keyboard.current.dKey.wasPressedThisFrame)
             {
                 character.localRotation = Quaternion.Euler(0, 90, 0);
                 moveDirection.x = 1;
@@ -134,5 +135,10 @@ public class GameManager : MonoBehaviour
         {
             gameState = GameState.Ready;
         }
+    }
+
+    private void OnCollisionEnter(Collision collision)
+    {
+        Destroy(gameObject);
     }
 }
