@@ -11,6 +11,8 @@ public class GameManager : MonoBehaviour
     [Header("Game parameters")]
     [SerializeField] private float moveDuration = 0.2f;
 
+    public int currentFarthestDistance = 0;
+
     enum GameState
     {
         Ready,
@@ -37,6 +39,8 @@ public class GameManager : MonoBehaviour
 
     private bool InStartArea(Vector2Int location)
     {
+        return true; // Movimiento libre para probar
+
         // Movement anywhere in the starting region is allowed.
         if ((location.y > -5) && (location.y < 0) && (location.x > -6) && (location.x < 6))
         {
@@ -134,5 +138,13 @@ public class GameManager : MonoBehaviour
         {
             gameState = GameState.Ready;
         }
+
+        if (character.position.z > currentFarthestDistance)
+            currentFarthestDistance = (int)character.position.z;
+    }
+
+    public int GetFarthestDistance()
+    {
+        return currentFarthestDistance;
     }
 }
