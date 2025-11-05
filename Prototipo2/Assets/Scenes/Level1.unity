@@ -258,8 +258,8 @@ Camera:
   near clip plane: 0.3
   far clip plane: 1000
   field of view: 60
-  orthographic: 0
-  orthographic size: 5
+  orthographic: 1
+  orthographic size: 3
   m_Depth: -1
   m_CullingMask:
     serializedVersion: 2
@@ -283,13 +283,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 17806969}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.19633003, y: -0.3139398, z: 0.06652745, w: 0.9265368}
-  m_LocalPosition: {x: 6.6961346, y: 5.446307, z: -5.935388}
+  m_LocalRotation: {x: 0.33682406, y: -0.16317599, z: 0.059391193, w: 0.92541665}
+  m_LocalPosition: {x: 2, y: 4, z: -3}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_LocalEulerAnglesHint: {x: 40, y: -20, z: 0}
 --- !u!114 &17806973
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1132,6 +1132,37 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 1874385644457549662, guid: c58a514cdf0f2c24695dfaab580c9834, type: 3}
   m_PrefabInstance: {fileID: 409615070}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &494278130
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 494278131}
+  m_Layer: 0
+  m_Name: TerrainHolder
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &494278131
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 494278130}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &495659148
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -2511,13 +2542,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 962833216}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.40821788, y: -0.23456968, z: 0.10938163, w: 0.8754261}
+  m_LocalRotation: {x: 0.38302222, y: -0.38302222, z: 0.17860618, w: 0.82139385}
   m_LocalPosition: {x: 0, y: 3, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 50, y: -30, z: 0}
+  m_LocalEulerAnglesHint: {x: 50, y: -50, z: 0}
 --- !u!114 &962833219
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2572,7 +2603,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   character: {fileID: 401840995}
   characterModel: {fileID: 376373818}
+  terrainHolder: {fileID: 494278131}
+  grassPrefab: {fileID: 3859348135394012647, guid: 5479be6b53bcbef4c8efe89a3c97597c, type: 3}
   moveDuration: 0.2
+  spawnDistance: 20
 --- !u!4 &976540220
 Transform:
   m_ObjectHideFlags: 0
@@ -4722,3 +4756,4 @@ SceneRoots:
   - {fileID: 554272947}
   - {fileID: 401840995}
   - {fileID: 976540220}
+  - {fileID: 494278131}

@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -7,9 +8,14 @@ public class GameManager : MonoBehaviour
     [Header("Game objects")]
     [SerializeField] private Transform character;
     [SerializeField] private Transform characterModel;
+    [SerializeField] private Transform terrainHolder;
+
+    [Header("Terrain objects")]
+    [SerializeField] private Grass grassPrefab;
 
     [Header("Game parameters")]
     [SerializeField] private float moveDuration = 0.2f;
+    [SerializeField] private int spawnDistance = 20;
 
     enum GameState
     {
@@ -19,6 +25,8 @@ public class GameManager : MonoBehaviour
     }
     private GameState gameState;
     private Vector2Int characterPos;
+    private int spawnLocation;
+    private List<(float terrainHeight, HashSet<int> locations)> obstacles = new();
 
     void Awake()
     {
@@ -33,6 +41,30 @@ public class GameManager : MonoBehaviour
         // Reset character position
         characterPos = new Vector2Int(0, -1);
         character.position = new Vector3(0, 0.2f, -1);
+
+        // Remove all terrain
+        obstacles.Clear();
+        foreach (Transform child in terrainHolder)
+        {
+            Destroy(child.gameObject);
+        }
+
+        // Reset level, and regenerate
+        spawnLocation = 0;
+        for (int i = 0; i < spawnDistance; i++)
+        {
+            SpawnObstacle();
+        }
+    }
+
+    private void SpawnObstacle()
+    {
+        // Create grass with terrain height of 0.2f.
+        Grass grass = Instantiate(grassPrefab, terrainHolder);
+        obstacles.Add((0.2f, grass.Init(spawnLocation)));
+
+        // Update to the next free location
+        spawnLocation++;
     }
 
     private bool InStartArea(Vector2Int location)
@@ -79,15 +111,31 @@ public class GameManager : MonoBehaviour
             {
                 Vector2Int destination = characterPos + moveDirection;
                 // In the start area there are no obstacles so you can move anywhere.
-                if (InStartArea(destination))
+                if (InStartArea(destination) || ((destination.y >= 0) && !obstacles[destination.y].locations.Contains(destination.x)))
                 {
                     // Update our character grid coordinate.
                     characterPos = destination;
                     // Call coroutine to move the character object.
                     StartCoroutine(MoveCharacter());
                 }
+
+                // Spawn new obstacles if necessary
+                while (obstacles.Count < (characterPos.y + spawnDistance))
+                {
+                    SpawnObstacle();
+                }
             }
         }
+
+        // Camera follow at (+2, 4, -3)
+        Vector3 cameraPosition = new(character.position.x + 2, 4, character.position.z - 3);
+
+        // Limit camera movement in x direction.
+        // Only follow the character as it moves to -3 and +3.
+        // The camera offset is +2 so that's -1 to +5 in the camera x position.
+        cameraPosition.x = Mathf.Clamp(cameraPosition.x, -1, 5);
+
+        Camera.main.transform.position = cameraPosition;
     }
 
     private IEnumerator MoveCharacter()
