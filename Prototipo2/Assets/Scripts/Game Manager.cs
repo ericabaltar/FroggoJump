@@ -96,6 +96,6 @@ public class GameManager : MonoBehaviour
 
     public bool CheckIfAccessible(Vector2Int pos)
     {
-        return !obstacles[pos.y].locations.Contains(pos.x);
+        return pos.y >= 0 && !obstacles[pos.y].locations.Contains(pos.x);
     }
 }

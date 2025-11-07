@@ -1,11 +1,13 @@
 using System.Collections;
+using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.TextCore.Text;
 
 public class PlayerController : MonoBehaviour
 {
-    [SerializeField] private float moveDuration = 0.2f;
+    [SerializeField] private float baseMoveDuration = 0.2f;
+    [SerializeField] private int maxStamina = 15;
 
     enum PlayerState
     {
@@ -17,12 +19,18 @@ public class PlayerController : MonoBehaviour
     private PlayerState state;
     private Vector2Int pos;
 
+    float currentMoveDuration;
+    int currentStamina;
+
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
         // Reset character position
         pos = new Vector2Int(0, 0);
         transform.position = new Vector3(0, 0.2f, 0);
+
+        currentMoveDuration = baseMoveDuration;
+        currentStamina = maxStamina;
     }
 
     // Update is called once per frame
@@ -81,10 +89,10 @@ public class PlayerController : MonoBehaviour
 
         Quaternion startRotation = transform.localRotation;
 
-        while (elapsedTime < moveDuration)
+        while (elapsedTime < currentMoveDuration)
         {
             // How far through the animation are we.
-            float percent = elapsedTime / moveDuration;
+            float percent = elapsedTime / currentMoveDuration;
 
             // Update the character position
             Vector3 newPos = Vector3.Lerp(startPos, endPos, percent);
@@ -110,11 +118,41 @@ public class PlayerController : MonoBehaviour
         pos = destination;
         GameManager.Instance.UpdateFarthestDistance(destination.y);
 
+        DecreaseStamina();
+
         // Need to check we're still in moving at the end.
         // If we're dead we don't want to go back to ready.
         if (state == PlayerState.Moving)
         {
             state = PlayerState.Ready;
+        }
+    }
+
+    void IncreaseStamina()
+    {
+        currentStamina = maxStamina;
+        currentMoveDuration = baseMoveDuration;
+    }
+
+    void DecreaseStamina()
+    {
+        if (currentStamina > 0)
+        {        
+            currentStamina -= 1;
+
+            if (currentStamina == 0)
+            {
+                currentMoveDuration = baseMoveDuration * 5;
+            }
+        }
+    }
+
+    private void OnTriggerEnter(Collider other)
+    {
+        if (other.CompareTag("Fly"))
+        {
+            IncreaseStamina();
+            Destroy(other.gameObject);
         }
     }
 }
