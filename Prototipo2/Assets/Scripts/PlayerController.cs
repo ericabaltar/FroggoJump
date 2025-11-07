@@ -59,7 +59,7 @@ public class PlayerController : MonoBehaviour
             {
                 Vector2Int destination = pos + moveDirection;
                 // In the start area there are no obstacles so you can move anywhere.
-                if (IsAccesible(destination))
+                if (GameManager.Instance.CheckIfAccessible(destination))
                 {
                     // Call coroutine to move the character object.
                     StartCoroutine(MoveCharacter(destination));
@@ -116,10 +116,5 @@ public class PlayerController : MonoBehaviour
         {
             state = PlayerState.Ready;
         }
-    }
-
-    private bool IsAccesible(Vector2Int location)
-    {
-        return true;
     }
 }

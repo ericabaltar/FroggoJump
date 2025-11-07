@@ -90,7 +90,12 @@ public class GameManager : MonoBehaviour
     }
 
     public int GetFarthestDistance()
-        {
-            return currentFarthestDistance;
-        }
+    {
+        return currentFarthestDistance;
+    }
+
+    public bool CheckIfAccessible(Vector2Int pos)
+    {
+        return !obstacles[pos.y].locations.Contains(pos.x);
+    }
 }
