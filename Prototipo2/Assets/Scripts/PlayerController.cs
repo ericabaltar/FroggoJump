@@ -1,70 +1,74 @@
-using System.Collections;
+﻿using System.Collections;
 using UnityEngine;
 using UnityEngine.InputSystem;
-using UnityEngine.TextCore.Text;
 
 public class PlayerController : MonoBehaviour
 {
     [SerializeField] private float moveDuration = 0.2f;
 
-    enum PlayerState
+    private enum PlayerState
     {
         Ready,
         Moving,
         Dead
     }
 
-    private PlayerState state;
+    private PlayerState state = PlayerState.Ready;
     private Vector2Int pos;
 
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
-        // Reset character position
+        // Posición inicial en la grid
         pos = new Vector2Int(0, 0);
         transform.position = new Vector3(0, 0.2f, 0);
+        state = PlayerState.Ready;
     }
 
-    // Update is called once per frame
     void Update()
     {
-        // Detect arrow key presses.
-        if (state == PlayerState.Ready)
-        {
-            Vector2Int moveDirection = Vector2Int.zero;
-            // Single if/else don't want to move diagonally.
-            if (Keyboard.current.upArrowKey.wasPressedThisFrame)
-            {
-                transform.localRotation = Quaternion.identity;
-                moveDirection.y = 1;
-            }
-            else if (Keyboard.current.downArrowKey.wasPressedThisFrame)
-            {
-                transform.localRotation = Quaternion.Euler(0, 180, 0);
-                moveDirection.y = -1;
-            }
-            else if (Keyboard.current.leftArrowKey.wasPressedThisFrame)
-            {
-                transform.localRotation = Quaternion.Euler(0, -90, 0);
-                moveDirection.x = -1;
-            }
-            else if (Keyboard.current.rightArrowKey.wasPressedThisFrame)
-            {
-                transform.localRotation = Quaternion.Euler(0, 90, 0);
-                moveDirection.x = 1;
-            }
+        if (state != PlayerState.Ready)
+            return;
 
-            // If the user wants to move
-            if (moveDirection != Vector2Int.zero)
-            {
-                Vector2Int destination = pos + moveDirection;
-                // In the start area there are no obstacles so you can move anywhere.
-                if (GameManager.Instance.CheckIfAccessible(destination))
-                {
-                    // Call coroutine to move the character object.
-                    StartCoroutine(MoveCharacter(destination));
-                }
-            }
+        // --- INPUT CON DIAGONALES ---
+        Vector2Int moveDirection = Vector2Int.zero;
+
+        // Ahora NO usamos if/else if, sino if independientes
+        if (Keyboard.current.upArrowKey.wasPressedThisFrame)
+        {
+            moveDirection.y += 1;
+        }
+        if (Keyboard.current.downArrowKey.wasPressedThisFrame)
+        {
+            moveDirection.y -= 1;
+        }
+        if (Keyboard.current.leftArrowKey.wasPressedThisFrame)
+        {
+            moveDirection.x -= 1;
+        }
+        if (Keyboard.current.rightArrowKey.wasPressedThisFrame)
+        {
+            moveDirection.x += 1;
+        }
+
+        // Por si acaso, clamp a [-1, 1]
+        moveDirection.x = Mathf.Clamp(moveDirection.x, -1, 1);
+        moveDirection.y = Mathf.Clamp(moveDirection.y, -1, 1);
+
+        // Si no se ha pulsado nada este frame, no nos movemos
+        if (moveDirection == Vector2Int.zero)
+            return;
+
+        // Rotar al jugador hacia la dirección del movimiento (incluye diagonales)
+        // Eje z = adelante (usamos y del grid), eje x = lateral
+        float yaw = Mathf.Atan2(moveDirection.x, moveDirection.y) * Mathf.Rad2Deg;
+        transform.localRotation = Quaternion.Euler(0f, yaw, 0f);
+
+        Vector2Int destination = pos + moveDirection;
+
+        // Comprobar que la casilla destino no está bloqueada
+        if (GameManager.Instance.CheckIfAccessible(destination))
+        {
+            StartCoroutine(MoveCharacter(destination));
         }
     }
 
@@ -73,48 +77,72 @@ public class PlayerController : MonoBehaviour
         state = PlayerState.Moving;
         float elapsedTime = 0f;
 
-        // The yHeight changes if we're on grass or road.
+        // Altura según el tipo de terreno de la fila destino
         float yHeight = 0.2f;
+        if (destination.y >= 0)
+        {
+            yHeight = GameManager.Instance.GetTerrainHeight(destination.y);
+        }
 
         Vector3 startPos = transform.position;
-        Vector3 endPos = new(destination.x, yHeight, destination.y);
+        Vector3 endPos = new Vector3(destination.x, yHeight, destination.y);
 
         Quaternion startRotation = transform.localRotation;
 
         while (elapsedTime < moveDuration)
         {
-            // How far through the animation are we.
             float percent = elapsedTime / moveDuration;
 
-            // Update the character position
+            // Interpolación + arco de salto
             Vector3 newPos = Vector3.Lerp(startPos, endPos, percent);
-            // Make the character jump in an arc
             newPos.y = yHeight + (0.5f * Mathf.Sin(Mathf.PI * percent));
             transform.position = newPos;
 
-            // Update the model rotation
+            // Pequeño bamboleo en X (como ya tenías)
             Vector3 rotation = transform.localRotation.eulerAngles;
-            transform.localRotation = Quaternion.Euler(-5f * Mathf.PI * Mathf.Cos(Mathf.PI * percent), rotation.y, rotation.z);
+            transform.localRotation = Quaternion.Euler(
+                -5f * Mathf.PI * Mathf.Cos(Mathf.PI * percent),
+                rotation.y,
+                rotation.z
+            );
 
-            // Update the elapsed time
             elapsedTime += Time.deltaTime;
-
             yield return null;
         }
 
-        // Ensure we're at the end.
+        // Aseguramos posición final
         transform.position = endPos;
         transform.localRotation = startRotation;
 
-        // Update our character grid coordinate.
+        // Actualizar coordenadas grid
         pos = destination;
         GameManager.Instance.UpdateFarthestDistance(destination.y);
 
-        // Need to check we're still in moving at the end.
-        // If we're dead we don't want to go back to ready.
+        // --- LÓGICA DE MUERTE: solo Road sin base ---
+        bool isRoadRow = GameManager.Instance.IsRoadRow(destination.y);
+
+        // Si es carretera y no hay base en esa casilla → muerte
+        if (isRoadRow && !GameManager.Instance.HasBaseAt(pos))
+        {
+            Die();
+            yield break;
+        }
+
         if (state == PlayerState.Moving)
         {
             state = PlayerState.Ready;
         }
     }
+
+    private void Die()
+    {
+        if (state == PlayerState.Dead)
+            return;
+
+        state = PlayerState.Dead;
+        Debug.Log("Has pisado carretera sin base. GAME OVER.");
+
+    }
 }
+
+

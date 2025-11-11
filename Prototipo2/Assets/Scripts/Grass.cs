@@ -1,36 +1,54 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 public class Grass : MonoBehaviour
 {
     [SerializeField] private Transform treePrefab;
 
-    public HashSet<int> Init(float z)
+ 
+    public HashSet<int> Init(float z, int reservedPathX)
     {
-        // Place the obstacle at the location provided.
         transform.position = new Vector3(0, 0, z);
 
-        // We always have obstacles outside the game area.
         HashSet<int> locations = new() { -6, 6 };
 
-        // Populate with some obstacles
+ 
         int numTrees = Random.Range(1, 5);
+
+        int safeRadius = 1;
 
         for (int i = 0; i < numTrees; i++)
         {
-            // Create a new tree object
-            Transform tree = Instantiate(treePrefab, transform);
+            int xPos;
+            int attempts = 0;
 
-            // Put it in a random position
-            int xPos = Random.Range(-5, 6);
+            do
+            {
+                attempts++;
+
+                xPos = Random.Range(-5, 6); 
+
+                if (attempts > 50)
+                    break;
+
+            }
+            while (Mathf.Abs(xPos - reservedPathX) <= safeRadius);
+
+            if (attempts > 50)
+                break;
+
+            // Instanciar árbol
+            Transform tree = Instantiate(treePrefab, transform);
             tree.position = new Vector3(xPos, 0.2f, z);
 
-            // Record the location in our HashSet.
+            // Guardar posición como bloqueada
             locations.Add(xPos);
         }
 
         return locations;
     }
 }
+
+
 
 
