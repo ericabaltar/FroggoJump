@@ -267,6 +267,8 @@ public class PlayerController : MonoBehaviour
     {
         currentStamina = maxStamina;
         currentMoveDuration = baseMoveDuration;
+
+        HudManager.Instance.SetStaminaBar((float)currentStamina / maxStamina);
     }
 
     void DecreaseStamina()
@@ -280,6 +282,8 @@ public class PlayerController : MonoBehaviour
                 currentMoveDuration = baseMoveDuration * 5f;
             }
         }
+
+        HudManager.Instance.SetStaminaBar((float)currentStamina / maxStamina);
     }
 
     // --- Triggers: Fly y MovingBase ---
