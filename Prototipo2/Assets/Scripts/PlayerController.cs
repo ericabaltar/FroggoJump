@@ -202,7 +202,15 @@ public class PlayerController : MonoBehaviour
             // Add key to dictionary when pressed
             inputHeldTimes[key.keyCode] = info;
 
-            TurnCharacter(direction);
+            if (state == PlayerState.Ready)
+            {
+                Vector2Int currentTotalDirection = Vector2Int.zero;
+                foreach (InputInfo infoo in inputHeldTimes.Values)
+                    currentTotalDirection += infoo.direction;
+
+                TurnCharacter(currentTotalDirection);
+            }
+
         }
 
         // If the key is being held (exists in the dictionary)
