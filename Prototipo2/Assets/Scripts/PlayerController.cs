@@ -1,16 +1,23 @@
 using System.Collections;
+using System.Collections.Generic;
 using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.Controls;
 
 public class PlayerController : MonoBehaviour
 {
     [SerializeField] private float baseMoveDuration = 0.2f;
     [SerializeField] private int maxStamina = 15;
-    [SerializeField] private float inputBufferTime = 0.01f;
+    [SerializeField] private float inputBufferTime = 0.15f;
+    [SerializeField] private float holdTime = 0.5f;
 
-    private Vector2Int bufferedInput;
+    private enum InputType { Tap, Hold }
+
+    private Vector2Int bufferedInputDirection;
+    private InputType bufferedInputType;
     private float bufferTimeLeft = 0f;
+    private Dictionary<Key, float> inputHeldTimes = new Dictionary<Key, float>();
 
     private enum PlayerState
     {
@@ -37,52 +44,22 @@ public class PlayerController : MonoBehaviour
 
     void Update()
     {
-        // Detect arrow key presses.
-        
-        Vector2Int inputDirection = Vector2Int.zero;
-        // Single if/else don't want to move diagonally.
-        if (Keyboard.current.upArrowKey.wasPressedThisFrame)
-        {
-            inputDirection.y = 1;
-        }
-        else if (Keyboard.current.downArrowKey.wasPressedThisFrame)
-        {
-            inputDirection.y = -1;
-        }
-        else if (Keyboard.current.leftArrowKey.wasPressedThisFrame)
-        {
-            inputDirection.x = -1;
-        }
-        else if (Keyboard.current.rightArrowKey.wasPressedThisFrame)
-        {
-            inputDirection.x = 1;
-        }
-
-        // If there was an input, save it
-        if (inputDirection != Vector2Int.zero)
-        {
-            bufferedInput = inputDirection;
-            bufferTimeLeft = inputBufferTime;
-        }
-
-        // Reduce buffer time left
-        if (bufferTimeLeft > 0f)
-        {
-            bufferTimeLeft -= Time.deltaTime;
-
-            // Remove the save input if enough time has passed
-            if (bufferTimeLeft <= 0f)
-                bufferedInput = Vector2Int.zero;
-        }
+        HandleInput();
 
         // If the user wants to move
-        if (state == PlayerState.Ready && bufferedInput != Vector2Int.zero)
+        if (state == PlayerState.Ready && bufferedInputDirection != Vector2Int.zero)
         {
-            Vector2Int moveDirection = bufferedInput;
+            Vector2Int moveDirection = bufferedInputDirection;
 
             TurnCharacter(moveDirection);
 
-            Vector2Int destination = pos + moveDirection;
+            // Move one or two tiles
+            Vector2Int destination;
+            if (bufferedInputType == InputType.Tap)
+                destination = pos + moveDirection;
+            else
+                destination = pos + moveDirection * 2;
+
             if (GameManager.Instance.CheckIfAccessible(destination))
             {
                 // Call coroutine to move the character object.
@@ -152,6 +129,68 @@ public class PlayerController : MonoBehaviour
         if (state == PlayerState.Moving)
         {
             state = PlayerState.Ready;
+        }
+    }
+
+    private void HandleInput()
+    {
+        // Detect arrow key presses.
+        DetectDirectionalInput(Keyboard.current.upArrowKey, Vector2Int.up);
+        DetectDirectionalInput(Keyboard.current.downArrowKey, Vector2Int.down);
+        DetectDirectionalInput(Keyboard.current.leftArrowKey, Vector2Int.left);
+        DetectDirectionalInput(Keyboard.current.rightArrowKey, Vector2Int.right);
+
+        // Reduce buffer time left
+        if (bufferTimeLeft > 0f)
+        {
+            bufferTimeLeft -= Time.deltaTime;
+
+            // Remove the save input if enough time has passed
+            if (bufferTimeLeft <= 0f)
+                bufferedInputDirection = Vector2Int.zero;
+        }
+    }
+
+    void AddInputToBuffer(Vector2Int direction, InputType inputType)
+    {
+        bufferedInputDirection = direction;
+        bufferedInputType = inputType;
+        bufferTimeLeft = inputBufferTime;
+    }
+
+    void DetectDirectionalInput(KeyControl key, Vector2Int direction)
+    {
+        if (key.wasPressedThisFrame)
+        {
+            // Add key to dictionary when pressed
+            inputHeldTimes[key.keyCode] = 0f;
+        }
+
+        // If the key is being held (exists in the dictionary)
+        if (inputHeldTimes.TryGetValue(key.keyCode, out float startTime))
+        {
+            inputHeldTimes[key.keyCode] += Time.deltaTime;
+
+            float duration = inputHeldTimes[key.keyCode];
+            if (duration > holdTime)
+            {
+                Debug.Log("hold detected"); // Feedback for the player to know if the movement will be tap or hold
+            }
+
+            // When the key is released, remove it from the dictionary and add the input to the buffer
+            if (key.wasReleasedThisFrame)
+            {
+                inputHeldTimes.Remove(key.keyCode);
+
+                if (duration < holdTime)
+                {
+                    AddInputToBuffer(direction, InputType.Tap);
+                }
+                else
+                {
+                    AddInputToBuffer(direction, InputType.Hold);
+                }
+            }
         }
     }
 
