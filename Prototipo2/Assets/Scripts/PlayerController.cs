@@ -8,6 +8,10 @@ public class PlayerController : MonoBehaviour
 {
     [SerializeField] private float baseMoveDuration = 0.2f;
     [SerializeField] private int maxStamina = 15;
+    [SerializeField] private float inputBufferTime = 0.01f;
+
+    private Vector2Int bufferedInput;
+    private float bufferTimeLeft = 0f;
 
     enum PlayerState
     {
@@ -37,41 +41,55 @@ public class PlayerController : MonoBehaviour
     void Update()
     {
         // Detect arrow key presses.
-        if (state == PlayerState.Ready)
+        
+        Vector2Int inputDirection = Vector2Int.zero;
+        // Single if/else don't want to move diagonally.
+        if (Keyboard.current.upArrowKey.wasPressedThisFrame)
         {
-            Vector2Int moveDirection = Vector2Int.zero;
-            // Single if/else don't want to move diagonally.
-            if (Keyboard.current.upArrowKey.wasPressedThisFrame)
-            {
-                transform.localRotation = Quaternion.identity;
-                moveDirection.y = 1;
-            }
-            else if (Keyboard.current.downArrowKey.wasPressedThisFrame)
-            {
-                transform.localRotation = Quaternion.Euler(0, 180, 0);
-                moveDirection.y = -1;
-            }
-            else if (Keyboard.current.leftArrowKey.wasPressedThisFrame)
-            {
-                transform.localRotation = Quaternion.Euler(0, -90, 0);
-                moveDirection.x = -1;
-            }
-            else if (Keyboard.current.rightArrowKey.wasPressedThisFrame)
-            {
-                transform.localRotation = Quaternion.Euler(0, 90, 0);
-                moveDirection.x = 1;
-            }
+            inputDirection.y = 1;
+        }
+        else if (Keyboard.current.downArrowKey.wasPressedThisFrame)
+        {
+            inputDirection.y = -1;
+        }
+        else if (Keyboard.current.leftArrowKey.wasPressedThisFrame)
+        {
+            inputDirection.x = -1;
+        }
+        else if (Keyboard.current.rightArrowKey.wasPressedThisFrame)
+        {
+            inputDirection.x = 1;
+        }
 
-            // If the user wants to move
-            if (moveDirection != Vector2Int.zero)
+        // If there was an input, save it
+        if (inputDirection != Vector2Int.zero)
+        {
+            bufferedInput = inputDirection;
+            bufferTimeLeft = inputBufferTime;
+        }
+
+        // Reduce buffer time left
+        if (bufferTimeLeft > 0f)
+        {
+            bufferTimeLeft -= Time.deltaTime;
+
+            // Remove the save input if enough time has passed
+            if (bufferTimeLeft <= 0f)
+                bufferedInput = Vector2Int.zero;
+        }
+
+        // If the user wants to move
+        if (state == PlayerState.Ready && bufferedInput != Vector2Int.zero)
+        {
+            Vector2Int moveDirection = bufferedInput;
+
+            TurnCharacter(moveDirection);
+
+            Vector2Int destination = pos + moveDirection;
+            if (GameManager.Instance.CheckIfAccessible(destination))
             {
-                Vector2Int destination = pos + moveDirection;
-                // In the start area there are no obstacles so you can move anywhere.
-                if (GameManager.Instance.CheckIfAccessible(destination))
-                {
-                    // Call coroutine to move the character object.
-                    StartCoroutine(MoveCharacter(destination));
-                }
+                // Call coroutine to move the character object.
+                StartCoroutine(MoveCharacter(destination));
             }
         }
     }
@@ -125,6 +143,26 @@ public class PlayerController : MonoBehaviour
         if (state == PlayerState.Moving)
         {
             state = PlayerState.Ready;
+        }
+    }
+
+    void TurnCharacter(Vector2Int moveDirection)
+    {
+        if (moveDirection.y == 1)
+        {
+            transform.localRotation = Quaternion.identity;
+        }
+        else if (moveDirection.y == -1)
+        {
+            transform.localRotation = Quaternion.Euler(0, 180, 0);
+        }
+        else if (moveDirection.x == 1)
+        {
+            transform.localRotation = Quaternion.Euler(0, 90, 0);
+        }
+        else if (moveDirection.x == -1)
+        {
+            transform.localRotation = Quaternion.Euler(0, -90, 0);
         }
     }
 
