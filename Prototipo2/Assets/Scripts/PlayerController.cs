@@ -10,6 +10,7 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private float baseMoveDuration = 0.2f;
     [SerializeField] private int maxStamina = 15;
     [SerializeField] private float inputBufferTime = 0.15f;
+    [SerializeField] private float maxTimeBetweenSameInputs = 0.01f;
     [SerializeField] private float holdTime = 0.5f;
 
     private enum InputType { Tap, Hold }
@@ -17,7 +18,13 @@ public class PlayerController : MonoBehaviour
     private Vector2Int bufferedInputDirection;
     private InputType bufferedInputType;
     private float bufferTimeLeft = 0f;
-    private Dictionary<Key, float> inputHeldTimes = new Dictionary<Key, float>();
+
+    struct InputInfo
+    {
+        public float timeHeld;
+        public Vector2Int direction;
+    }
+    private Dictionary<Key, InputInfo> inputHeldTimes = new Dictionary<Key, InputInfo>();
 
     private enum PlayerState
     {
@@ -34,7 +41,6 @@ public class PlayerController : MonoBehaviour
 
     void Start()
     {
-        // Posición inicial en la grid
         pos = new Vector2Int(0, 0);
         transform.position = new Vector3(0, 0.2f, 0);
 
@@ -62,7 +68,6 @@ public class PlayerController : MonoBehaviour
 
             if (GameManager.Instance.CheckIfAccessible(destination))
             {
-                // Call coroutine to move the character object.
                 StartCoroutine(MoveCharacter(destination));
             }
         }
@@ -73,7 +78,6 @@ public class PlayerController : MonoBehaviour
         state = PlayerState.Moving;
         float elapsedTime = 0f;
 
-        // Altura según el tipo de terreno de la fila destino
         float yHeight = 0.2f;
         if (destination.y >= 0)
         {
@@ -87,14 +91,13 @@ public class PlayerController : MonoBehaviour
 
         while (elapsedTime < currentMoveDuration)
         {
-            float percent = elapsedTime / baseMoveDuration;
 
-            // Interpolación + arco de salto
+            float percent = elapsedTime / currentMoveDuration;
+
             Vector3 newPos = Vector3.Lerp(startPos, endPos, percent);
             newPos.y = yHeight + (0.5f * Mathf.Sin(Mathf.PI * percent));
             transform.position = newPos;
 
-            // Pequeño bamboleo en X (como ya tenías)
             Vector3 rotation = transform.localRotation.eulerAngles;
             transform.localRotation = Quaternion.Euler(
                 -5f * Mathf.PI * Mathf.Cos(Mathf.PI * percent),
@@ -106,18 +109,14 @@ public class PlayerController : MonoBehaviour
             yield return null;
         }
 
-        // Aseguramos posición final
         transform.position = endPos;
         transform.localRotation = startRotation;
 
-        // Actualizar coordenadas grid
         pos = destination;
         GameManager.Instance.UpdateFarthestDistance(destination.y);
 
-        // --- LÓGICA DE MUERTE: solo Road sin base ---
         bool isRoadRow = GameManager.Instance.IsRoadRow(destination.y);
 
-        // Si es carretera y no hay base en esa casilla → muerte
         if (isRoadRow && !GameManager.Instance.HasBaseAt(pos))
         {
             Die();
@@ -162,16 +161,35 @@ public class PlayerController : MonoBehaviour
     {
         if (key.wasPressedThisFrame)
         {
+            InputInfo info = new InputInfo
+            {
+                timeHeld = 0f,
+                direction = direction
+            };
+
             // Add key to dictionary when pressed
-            inputHeldTimes[key.keyCode] = 0f;
+            inputHeldTimes[key.keyCode] = info;
         }
 
         // If the key is being held (exists in the dictionary)
-        if (inputHeldTimes.TryGetValue(key.keyCode, out float startTime))
+        if (inputHeldTimes.TryGetValue(key.keyCode, out InputInfo inputInfo))
         {
-            inputHeldTimes[key.keyCode] += Time.deltaTime;
+            // Update time held
+            inputInfo.timeHeld += Time.deltaTime;
+            inputHeldTimes[key.keyCode] = inputInfo;
 
-            float duration = inputHeldTimes[key.keyCode];
+            float duration = 0f;
+            Vector2Int totalMovementDirection = Vector2Int.zero;
+            foreach (InputInfo info in inputHeldTimes.Values)
+            {
+                // Get duration of the current pressed key that was held longer
+                if (info.timeHeld > duration)
+                    duration = info.timeHeld;
+
+                // Get total movement direction
+                totalMovementDirection += info.direction;
+            }
+
             if (duration > holdTime)
             {
                 Debug.Log("hold detected"); // Feedback for the player to know if the movement will be tap or hold
@@ -180,15 +198,15 @@ public class PlayerController : MonoBehaviour
             // When the key is released, remove it from the dictionary and add the input to the buffer
             if (key.wasReleasedThisFrame)
             {
-                inputHeldTimes.Remove(key.keyCode);
+                inputHeldTimes.Clear();
 
                 if (duration < holdTime)
                 {
-                    AddInputToBuffer(direction, InputType.Tap);
+                    AddInputToBuffer(totalMovementDirection, InputType.Tap);
                 }
                 else
                 {
-                    AddInputToBuffer(direction, InputType.Hold);
+                    AddInputToBuffer(totalMovementDirection, InputType.Hold);
                 }
             }
         }
@@ -201,27 +219,12 @@ public class PlayerController : MonoBehaviour
 
         state = PlayerState.Dead;
         Debug.Log("Has pisado carretera sin base. GAME OVER.");
-
     }
 
     void TurnCharacter(Vector2Int moveDirection)
     {
-        if (moveDirection.y == 1)
-        {
-            transform.localRotation = Quaternion.identity;
-        }
-        else if (moveDirection.y == -1)
-        {
-            transform.localRotation = Quaternion.Euler(0, 180, 0);
-        }
-        else if (moveDirection.x == 1)
-        {
-            transform.localRotation = Quaternion.Euler(0, 90, 0);
-        }
-        else if (moveDirection.x == -1)
-        {
-            transform.localRotation = Quaternion.Euler(0, -90, 0);
-        }
+        float yaw = Mathf.Atan2(moveDirection.x, moveDirection.y) * Mathf.Rad2Deg;
+        transform.localRotation = Quaternion.Euler(0f, yaw, 0f);
     }
 
     void IncreaseStamina()
@@ -233,7 +236,7 @@ public class PlayerController : MonoBehaviour
     void DecreaseStamina()
     {
         if (currentStamina > 0)
-        {        
+        {
             currentStamina -= 1;
 
             if (currentStamina == 0)
@@ -252,5 +255,4 @@ public class PlayerController : MonoBehaviour
         }
     }
 }
-
 
