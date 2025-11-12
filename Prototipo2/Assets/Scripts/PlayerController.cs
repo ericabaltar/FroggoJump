@@ -2,7 +2,6 @@ using System.Collections;
 using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.InputSystem;
-using UnityEngine.TextCore.Text;
 
 public class PlayerController : MonoBehaviour
 {
@@ -13,23 +12,22 @@ public class PlayerController : MonoBehaviour
     private Vector2Int bufferedInput;
     private float bufferTimeLeft = 0f;
 
-    enum PlayerState
+    private enum PlayerState
     {
         Ready,
         Moving,
         Dead
     }
 
-    private PlayerState state;
+    private PlayerState state = PlayerState.Ready;
     private Vector2Int pos;
 
     float currentMoveDuration;
     int currentStamina;
 
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
-        // Reset character position
+        // Posición inicial en la grid
         pos = new Vector2Int(0, 0);
         transform.position = new Vector3(0, 0.2f, 0);
 
@@ -37,7 +35,6 @@ public class PlayerController : MonoBehaviour
         currentStamina = maxStamina;
     }
 
-    // Update is called once per frame
     void Update()
     {
         // Detect arrow key presses.
@@ -99,51 +96,73 @@ public class PlayerController : MonoBehaviour
         state = PlayerState.Moving;
         float elapsedTime = 0f;
 
-        // The yHeight changes if we're on grass or road.
+        // Altura según el tipo de terreno de la fila destino
         float yHeight = 0.2f;
+        if (destination.y >= 0)
+        {
+            yHeight = GameManager.Instance.GetTerrainHeight(destination.y);
+        }
 
         Vector3 startPos = transform.position;
-        Vector3 endPos = new(destination.x, yHeight, destination.y);
+        Vector3 endPos = new Vector3(destination.x, yHeight, destination.y);
 
         Quaternion startRotation = transform.localRotation;
 
         while (elapsedTime < currentMoveDuration)
         {
-            // How far through the animation are we.
-            float percent = elapsedTime / currentMoveDuration;
+            float percent = elapsedTime / baseMoveDuration;
 
-            // Update the character position
+            // Interpolación + arco de salto
             Vector3 newPos = Vector3.Lerp(startPos, endPos, percent);
-            // Make the character jump in an arc
             newPos.y = yHeight + (0.5f * Mathf.Sin(Mathf.PI * percent));
             transform.position = newPos;
 
-            // Update the model rotation
+            // Pequeño bamboleo en X (como ya tenías)
             Vector3 rotation = transform.localRotation.eulerAngles;
-            transform.localRotation = Quaternion.Euler(-5f * Mathf.PI * Mathf.Cos(Mathf.PI * percent), rotation.y, rotation.z);
+            transform.localRotation = Quaternion.Euler(
+                -5f * Mathf.PI * Mathf.Cos(Mathf.PI * percent),
+                rotation.y,
+                rotation.z
+            );
 
-            // Update the elapsed time
             elapsedTime += Time.deltaTime;
-
             yield return null;
         }
 
-        // Ensure we're at the end.
+        // Aseguramos posición final
         transform.position = endPos;
         transform.localRotation = startRotation;
 
-        // Update our character grid coordinate.
+        // Actualizar coordenadas grid
         pos = destination;
         GameManager.Instance.UpdateFarthestDistance(destination.y);
 
+        // --- LÓGICA DE MUERTE: solo Road sin base ---
+        bool isRoadRow = GameManager.Instance.IsRoadRow(destination.y);
+
+        // Si es carretera y no hay base en esa casilla → muerte
+        if (isRoadRow && !GameManager.Instance.HasBaseAt(pos))
+        {
+            Die();
+            yield break;
+        }
+
         DecreaseStamina();
 
-        // Need to check we're still in moving at the end.
-        // If we're dead we don't want to go back to ready.
         if (state == PlayerState.Moving)
         {
             state = PlayerState.Ready;
         }
+    }
+
+    private void Die()
+    {
+        if (state == PlayerState.Dead)
+            return;
+
+        state = PlayerState.Dead;
+        Debug.Log("Has pisado carretera sin base. GAME OVER.");
+
     }
 
     void TurnCharacter(Vector2Int moveDirection)
@@ -194,3 +213,5 @@ public class PlayerController : MonoBehaviour
         }
     }
 }
+
+
