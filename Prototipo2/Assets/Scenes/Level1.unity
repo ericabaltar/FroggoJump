@@ -3073,7 +3073,16 @@ MonoBehaviour:
   terrainHolder: {fileID: 494278131}
   grassPrefab: {fileID: 3859348135394012647, guid: 5479be6b53bcbef4c8efe89a3c97597c, type: 3}
   roadPrefab: {fileID: 6028958659787560634, guid: b63056cd4d3e630459159274891e6d2d, type: 3}
+  staticBasePrefab: {fileID: 2327832674794322716, guid: d4ce21c40ac3a5741ba6e3c059facec0, type: 3}
+  movingBasePrefab: {fileID: -5970815299805970063, guid: df4c5a7d868556b4cb92ce8d69dd130f, type: 3}
   spawnDistance: 20
+  minX: -5
+  maxX: 5
+  minBasesPerRow: 1
+  maxBasesPerRow: 3
+  movingBaseChance: 0.5
+  movingBaseSpeedMin: 2
+  movingBaseSpeedMax: 3.5
 --- !u!4 &976540220
 Transform:
   m_ObjectHideFlags: 0
@@ -6183,6 +6192,14 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 4256929539382444464, guid: 80047c07b84a33e4facaaac63b79e070, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: 752dce611f9f8fe4eb21d01d251a2880, type: 2}
+    - target: {fileID: 6694125666736155910, guid: 80047c07b84a33e4facaaac63b79e070, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: 752dce611f9f8fe4eb21d01d251a2880, type: 2}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []

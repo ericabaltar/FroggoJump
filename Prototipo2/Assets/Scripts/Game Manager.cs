@@ -1,4 +1,3 @@
-using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -13,43 +12,46 @@ public class GameManager : MonoBehaviour
     [SerializeField] private Grass grassPrefab;
     [SerializeField] private Road roadPrefab;
 
-    [Header("Base objects")]
-    [SerializeField] private Transform basePrefab;
+    [Header("Base prefabs")]
+    [SerializeField] private Transform staticBasePrefab;   // BASE ESTÁTICA (visual distinto)
+    [SerializeField] private MovingBase movingBasePrefab;  // BASE MÓVIL (script distinto)
 
-    [Header("Game parameters")]
+    [Header("Spawn params")]
     [SerializeField] private int spawnDistance = 20;
 
-    [Header("Base / camino seguro")]
+    [Header("Grid X range")]
     [SerializeField] private int minX = -5;
     [SerializeField] private int maxX = 5;
-    [SerializeField] private int minBasesPerRow = 1;
-    [SerializeField] private int maxBasesPerRow = 3;
 
-    private int spawnLocation;
+    [Header("Cantidad de bases por fila ROAD")]
+    [SerializeField] private int minBasesPerRow = 2;
+    [SerializeField] private int maxBasesPerRow = 4;
 
+    [Tooltip("Probabilidad de que una base extra sea MÓVIL (la base del camino seguro es siempre estática).")]
+    [Range(0f, 1f)][SerializeField] private float movingBaseChance = 0.5f;
+
+    [Header("Parámetros bases móviles")]
+    [SerializeField] private float movingBaseSpeedMin = 2f;
+    [SerializeField] private float movingBaseSpeedMax = 3.5f;
+
+    // obstacles: (isRoad, yHeight, blockedX)
     private List<(bool isRoad, float terrainHeight, HashSet<int> locations)> obstacles = new();
-
-    // Por cada fila (z), qué x tienen base (en Grass estará vacío)
+    // posiciones X con BASE ESTÁTICA (las móviles se detectan por trigger)
     private List<HashSet<int>> baseLocations = new();
 
+    private int spawnLocation;
     private int currentFarthestDistance = 0;
     public static GameManager Instance { get; private set; }
 
-    // X del camino seguro que serpentea
+    // Camino serpenteante garantizado
     private int currentPathX;
     private bool pathInitialized = false;
 
     void Awake()
     {
-        if (Instance != null && Instance != this)
-        {
-            Destroy(gameObject);
-            return;
-        }
-
+        if (Instance != null && Instance != this) { Destroy(gameObject); return; }
         Instance = this;
         DontDestroyOnLoad(gameObject);
-
         NewLevel();
     }
 
@@ -58,40 +60,23 @@ public class GameManager : MonoBehaviour
         obstacles.Clear();
         baseLocations.Clear();
 
-        foreach (Transform child in terrainHolder)
-        {
-            Destroy(child.gameObject);
-        }
+        foreach (Transform child in terrainHolder) Destroy(child.gameObject);
 
         spawnLocation = 0;
         currentFarthestDistance = 0;
 
-        // Camino empieza en 0 (clamp por si minX/maxX cambian)
         currentPathX = Mathf.Clamp(0, minX, maxX);
         pathInitialized = true;
 
-        for (int i = 0; i < spawnDistance; i++)
-        {
-            SpawnObstacle();
-        }
+        for (int i = 0; i < spawnDistance; i++) SpawnObstacle();
     }
 
     private void SpawnObstacle()
     {
-        // Camino seguro: nueva X objetivo (serpentea -1, 0, +1)
-        int desiredPathX = currentPathX;
-        if (pathInitialized)
-        {
-            int delta = Random.Range(-1, 2); // -1, 0, 1
-            desiredPathX = Mathf.Clamp(currentPathX + delta, minX, maxX);
-        }
-        else
-        {
-            desiredPathX = Mathf.Clamp(0, minX, maxX);
-            pathInitialized = true;
-        }
+        // Siguiente x del camino (serpenteo)
+        int desiredPathX = currentPathX + Random.Range(-1, 2); // -1,0,1
+        desiredPathX = Mathf.Clamp(desiredPathX, minX, maxX);
 
-        // Probabilidad de Road
         float roadProbability = Mathf.Lerp(0.5f, 0.9f, spawnLocation / 250f);
 
         float terrainHeight;
@@ -99,115 +84,112 @@ public class GameManager : MonoBehaviour
 
         if (Random.value < roadProbability)
         {
-            // -------- FILA ROAD --------
-            Road road = Instantiate(roadPrefab, terrainHolder);
-            obstaclePositions = road.Init(spawnLocation);   // normalmente solo -6 y 6
+            // ROAD
+            var road = Instantiate(roadPrefab, terrainHolder);
+            obstaclePositions = road.Init(spawnLocation);     // normalmente {-6, 6}
             terrainHeight = 0.1f;
 
-            // Aseguramos que la X de camino no esté bloqueada
-            int safePathX = FindNearestFreeX(desiredPathX, obstaclePositions);
-            currentPathX = safePathX;
+            // Asegurar que la columna del camino está libre
+            currentPathX = FindNearestFreeX(desiredPathX, obstaclePositions);
 
             obstacles.Add((true, terrainHeight, obstaclePositions));
 
-            // Generar bases (nenúfares) siguiendo el camino seguro
-            HashSet<int> basesThisRow = SpawnBasesForRow(spawnLocation, terrainHeight, obstaclePositions, currentPathX);
-            baseLocations.Add(basesThisRow);
+            // Spawn de bases: 1 estática en currentPathX (garantía de paso) + extras (mix estáticas/móviles)
+            baseLocations.Add(SpawnBasesForRoadRow(spawnLocation, terrainHeight, obstaclePositions, currentPathX));
         }
         else
         {
-            // -------- FILA GRASS --------
-            Grass grass = Instantiate(grassPrefab, terrainHolder);
-            // Pasamos la X del camino para NO poner árboles ahí
-            obstaclePositions = grass.Init(spawnLocation, desiredPathX);
+            // GRASS
+            var grass = Instantiate(grassPrefab, terrainHolder);
+            obstaclePositions = grass.Init(spawnLocation, desiredPathX); // evita árboles en la columna del camino
             terrainHeight = 0.2f;
 
             currentPathX = desiredPathX;
 
             obstacles.Add((false, terrainHeight, obstaclePositions));
-
-            // En Grass NO hay bases
-            baseLocations.Add(new HashSet<int>());
+            baseLocations.Add(new HashSet<int>()); // sin bases en grass
         }
 
         spawnLocation++;
     }
 
-    // Busca la X libre más cercana a preferredX dentro de [minX, maxX]
     private int FindNearestFreeX(int preferredX, HashSet<int> blocked)
     {
-        if (!blocked.Contains(preferredX))
-            return preferredX;
+        if (!blocked.Contains(preferredX)) return preferredX;
 
         for (int offset = 1; offset <= maxX - minX; offset++)
         {
             int left = preferredX - offset;
             int right = preferredX + offset;
 
-            bool leftOk = left >= minX && !blocked.Contains(left);
-            bool rightOk = right <= maxX && !blocked.Contains(right);
-
-            if (leftOk && rightOk)
-            {
-                // Si ambos sirven, elegimos uno al azar
-                return Random.value < 0.5f ? left : right;
-            }
-
-            if (leftOk) return left;
-            if (rightOk) return right;
+            if (left >= minX && !blocked.Contains(left)) return left;
+            if (right <= maxX && !blocked.Contains(right)) return right;
         }
 
-        Debug.LogWarning("No se encontró posición libre para el camino en fila " + spawnLocation);
+        Debug.LogWarning("No X libre para camino en fila " + spawnLocation);
         return Mathf.Clamp(preferredX, minX, maxX);
     }
 
-    // Genera bases en una fila de Road, forzando una en forcedPathX (camino seguro)
-    private HashSet<int> SpawnBasesForRow(int z, float yHeight, HashSet<int> blockedPositions, int forcedPathX)
+    /// <summary>
+    /// Crea bases en una fila ROAD:
+    /// - 1 base ESTÁTICA en forcedPathX (garantiza paso)
+    /// - Resto entre estáticas y MÓVILES según movingBaseChance
+    /// Las móviles NO se guardan en baseLocations (se detectan por trigger).
+    /// </summary>
+    private HashSet<int> SpawnBasesForRoadRow(int z, float yHeight, HashSet<int> blockedPositions, int forcedPathX)
     {
-        HashSet<int> bases = new();
+        HashSet<int> staticXs = new();
 
-        if (basePrefab == null)
+        // 1) Base estática garantizada (camino)
+        if (staticBasePrefab != null)
         {
-            Debug.LogWarning("BasePrefab no asignado en GameManager, no se generarán bases.");
-            return bases;
+            int fx = blockedPositions.Contains(forcedPathX) ? FindNearestFreeX(forcedPathX, blockedPositions) : forcedPathX;
+            Transform b = Instantiate(staticBasePrefab, terrainHolder);
+            b.position = new Vector3(fx, yHeight, z);
+            staticXs.Add(fx);
+        }
+        else
+        {
+            Debug.LogWarning("staticBasePrefab sin asignar: no se garantiza camino seguro.");
         }
 
-        // 1) Nenúfar garantizado en la X del camino seguro
-        int forcedX = forcedPathX;
-
-        // Por si acaso esa X está bloqueada (no debería en Road, pero seguridad extra)
-        if (blockedPositions.Contains(forcedX))
-        {
-            forcedX = FindNearestFreeX(forcedX, blockedPositions);
-        }
-
-        Transform forcedBase = Instantiate(basePrefab, terrainHolder);
-        forcedBase.position = new Vector3(forcedX, yHeight, z);
-        bases.Add(forcedX);
-
-        // 2) Nenúfares extra aleatorios
-        int numBases = Random.Range(minBasesPerRow, maxBasesPerRow + 1);
+        // 2) Extras
+        int targetTotal = Random.Range(minBasesPerRow, maxBasesPerRow + 1);
         int attempts = 0;
 
-        while (bases.Count < numBases && attempts < 50)
+        while (staticXs.Count < targetTotal && attempts < 80)
         {
             attempts++;
 
             int x = Random.Range(minX, maxX + 1);
+            if (blockedPositions.Contains(x)) continue;
+            if (staticXs.Contains(x)) continue; // evitar duplicar x de estáticas
 
-            if (blockedPositions.Contains(x))
-                continue;
+            bool makeMoving = movingBasePrefab != null && Random.value < movingBaseChance;
 
-            if (bases.Contains(x))
-                continue;
+            if (makeMoving)
+            {
+                // Base móvil (distinta a la estática)
+                var mb = Instantiate(movingBasePrefab, terrainHolder);
+                float spd = Random.Range(movingBaseSpeedMin, movingBaseSpeedMax);
+                bool toRight = Random.value < 0.5f;
+                mb.Init(z, yHeight, minX, maxX, toRight, spd, x);
 
-            Transform b = Instantiate(basePrefab, terrainHolder);
-            b.position = new Vector3(x, yHeight, z);
-
-            bases.Add(x);
+                // NO añadimos su X a staticXs -> se considera segura por trigger en el Player
+            }
+            else
+            {
+                // Base estática extra
+                if (staticBasePrefab != null)
+                {
+                    Transform b = Instantiate(staticBasePrefab, terrainHolder);
+                    b.position = new Vector3(x, yHeight, z);
+                    staticXs.Add(x);
+                }
+            }
         }
 
-        return bases;
+        return staticXs;
     }
 
     public void UpdateFarthestDistance(int distance)
@@ -215,12 +197,34 @@ public class GameManager : MonoBehaviour
         if (distance > currentFarthestDistance)
         {
             currentFarthestDistance = distance;
-
             while (obstacles.Count < (distance + spawnDistance))
-            {
                 SpawnObstacle();
-            }
         }
+    }
+
+    public bool CheckIfAccessible(Vector2Int pos)
+    {
+        if (pos.y < 0 || pos.y >= obstacles.Count) return false;
+        return !obstacles[pos.y].locations.Contains(pos.x);
+    }
+
+    // Solo devuelve true para bases ESTÁTICAS
+    public bool HasBaseAt(Vector2Int pos)
+    {
+        if (pos.y < 0 || pos.y >= baseLocations.Count) return false;
+        return baseLocations[pos.y].Contains(pos.x);
+    }
+
+    public bool IsRoadRow(int z)
+    {
+        if (z < 0 || z >= obstacles.Count) return false;
+        return obstacles[z].isRoad;
+    }
+
+    public float GetTerrainHeight(int z)
+    {
+        if (z < 0 || z >= obstacles.Count) return 0.2f;
+        return obstacles[z].terrainHeight;
     }
 
     public int GetFarthestDistance()
@@ -228,36 +232,4 @@ public class GameManager : MonoBehaviour
         return currentFarthestDistance;
     }
 
-    public bool CheckIfAccessible(Vector2Int pos)
-    {
-        if (pos.y < 0 || pos.y >= obstacles.Count)
-            return false;
-
-        return !obstacles[pos.y].locations.Contains(pos.x);
-    }
-
-    public bool HasBaseAt(Vector2Int pos)
-    {
-        if (pos.y < 0 || pos.y >= baseLocations.Count)
-            return false;
-
-        return baseLocations[pos.y].Contains(pos.x);
-    }
-
-    public bool IsRoadRow(int z)
-    {
-        if (z < 0 || z >= obstacles.Count)
-            return false;
-
-        return obstacles[z].isRoad;
-    }
-
-    public float GetTerrainHeight(int z)
-    {
-        if (z < 0 || z >= obstacles.Count)
-            return 0.2f;
-
-        return obstacles[z].terrainHeight;
-    }
 }
-

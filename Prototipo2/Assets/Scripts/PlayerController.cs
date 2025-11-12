@@ -25,18 +25,28 @@ public class PlayerController : MonoBehaviour
     float currentMoveDuration;
     int currentStamina;
 
+    // --- Bases móviles (nenúfares) ---
+    private bool isOnMovingBase = false;
+    private MovingBase currentMovingBase = null;
+
+    // Guardamos el padre previo para restaurarlo si hace falta
+    private Transform defaultParent;
+
     void Start()
     {
+        // Posición inicial en la grid
         pos = new Vector2Int(0, 0);
         transform.position = new Vector3(0, 0.2f, 0);
 
         currentMoveDuration = baseMoveDuration;
         currentStamina = maxStamina;
+
+        defaultParent = transform.parent;
     }
 
     void Update()
     {
-  
+        // --- INPUT CON DIAGONALES + BUFFER ---
         bool anyDirPressedThisFrame =
             Keyboard.current.upArrowKey.wasPressedThisFrame ||
             Keyboard.current.downArrowKey.wasPressedThisFrame ||
@@ -52,19 +62,16 @@ public class PlayerController : MonoBehaviour
             if (Keyboard.current.rightArrowKey.isPressed) inputDirection.x += 1;
             if (Keyboard.current.leftArrowKey.isPressed) inputDirection.x -= 1;
 
-     
             inputDirection.x = Mathf.Clamp(inputDirection.x, -1, 1);
             inputDirection.y = Mathf.Clamp(inputDirection.y, -1, 1);
 
             if (inputDirection != Vector2Int.zero)
             {
-                // Guardamos en buffer
                 bufferedInput = inputDirection;
                 bufferTimeLeft = inputBufferTime;
             }
         }
 
-        // Reducir tiempo de buffer
         if (bufferTimeLeft > 0f)
         {
             bufferTimeLeft -= Time.deltaTime;
@@ -89,8 +96,16 @@ public class PlayerController : MonoBehaviour
     private IEnumerator MoveCharacter(Vector2Int destination)
     {
         state = PlayerState.Moving;
+
+        // Si estamos subidos a una base móvil, soltamos antes de saltar
+        if (currentMovingBase != null)
+        {
+            transform.SetParent(defaultParent, true); // mantener world pos
+        }
+
         float elapsedTime = 0f;
 
+        // Altura según el tipo de terreno de la fila destino
         float yHeight = 0.2f;
         if (destination.y >= 0)
         {
@@ -104,13 +119,14 @@ public class PlayerController : MonoBehaviour
 
         while (elapsedTime < currentMoveDuration)
         {
-
             float percent = elapsedTime / currentMoveDuration;
 
+            // Interpolación + arco de salto
             Vector3 newPos = Vector3.Lerp(startPos, endPos, percent);
             newPos.y = yHeight + (0.5f * Mathf.Sin(Mathf.PI * percent));
             transform.position = newPos;
 
+            // Pequeño bamboleo en X
             Vector3 rotation = transform.localRotation.eulerAngles;
             transform.localRotation = Quaternion.Euler(
                 -5f * Mathf.PI * Mathf.Cos(Mathf.PI * percent),
@@ -122,15 +138,17 @@ public class PlayerController : MonoBehaviour
             yield return null;
         }
 
+        // Aseguramos posición final
         transform.position = endPos;
         transform.localRotation = startRotation;
 
+        // Actualizar coordenadas grid
         pos = destination;
         GameManager.Instance.UpdateFarthestDistance(destination.y);
 
+        // --- LÓGICA DE MUERTE: solo Road sin base estática y sin base móvil ---
         bool isRoadRow = GameManager.Instance.IsRoadRow(destination.y);
-
-        if (isRoadRow && !GameManager.Instance.HasBaseAt(pos))
+        if (isRoadRow && !GameManager.Instance.HasBaseAt(pos) && !isOnMovingBase)
         {
             Die();
             yield break;
@@ -141,6 +159,17 @@ public class PlayerController : MonoBehaviour
         if (state == PlayerState.Moving)
         {
             state = PlayerState.Ready;
+
+            // Si hemos aterrizado encima de una base móvil (trigger activo),
+            // nos volvemos a subir (parentar) para movernos juntos.
+            if (isOnMovingBase && currentMovingBase != null)
+            {
+                transform.SetParent(currentMovingBase.transform, true); // conservar world pos
+            }
+            else
+            {
+                transform.SetParent(defaultParent, true);
+            }
         }
     }
 
@@ -150,11 +179,13 @@ public class PlayerController : MonoBehaviour
             return;
 
         state = PlayerState.Dead;
+        transform.SetParent(defaultParent, true); // por si estábamos parentados
         Debug.Log("Has pisado carretera sin base. GAME OVER.");
     }
 
     void TurnCharacter(Vector2Int moveDirection)
     {
+        // Rotación hacia la dirección real (incluye diagonales)
         float yaw = Mathf.Atan2(moveDirection.x, moveDirection.y) * Mathf.Rad2Deg;
         transform.localRotation = Quaternion.Euler(0f, yaw, 0f);
     }
@@ -173,11 +204,12 @@ public class PlayerController : MonoBehaviour
 
             if (currentStamina == 0)
             {
-                currentMoveDuration = baseMoveDuration * 5;
+                currentMoveDuration = baseMoveDuration * 5f;
             }
         }
     }
 
+    // --- Triggers: Fly y MovingBase ---
     private void OnTriggerEnter(Collider other)
     {
         if (other.CompareTag("Fly"))
@@ -185,6 +217,46 @@ public class PlayerController : MonoBehaviour
             IncreaseStamina();
             Destroy(other.gameObject);
         }
+        else if (other.CompareTag("MovingBase"))
+        {
+            isOnMovingBase = true;
+            currentMovingBase = other.GetComponent<MovingBase>();
+
+            // Solo nos subimos si no estamos en mitad de un salto
+            if (state == PlayerState.Ready && currentMovingBase != null)
+            {
+                transform.SetParent(currentMovingBase.transform, true);
+            }
+        }
+    }
+
+    private void OnTriggerStay(Collider other)
+    {
+        if (other.CompareTag("MovingBase"))
+        {
+            isOnMovingBase = true;
+
+            if (currentMovingBase == null)
+                currentMovingBase = other.GetComponent<MovingBase>();
+
+            if (state == PlayerState.Ready && currentMovingBase != null && transform.parent != currentMovingBase.transform)
+            {
+                transform.SetParent(currentMovingBase.transform, true);
+            }
+        }
+    }
+
+    private void OnTriggerExit(Collider other)
+    {
+        if (other.CompareTag("MovingBase"))
+        {
+            // Si sales de la base móvil, deja de ser su hijo
+            if (other.GetComponent<MovingBase>() == currentMovingBase)
+            {
+                isOnMovingBase = false;
+                currentMovingBase = null;
+                transform.SetParent(defaultParent, true);
+            }
+        }
     }
 }
-
