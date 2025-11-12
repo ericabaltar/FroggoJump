@@ -200,6 +200,8 @@ public class GameManager : MonoBehaviour
             while (obstacles.Count < (distance + spawnDistance))
                 SpawnObstacle();
         }
+
+        HudManager.Instance.SetScore(currentFarthestDistance);
     }
 
     public bool CheckIfAccessible(Vector2Int pos)
