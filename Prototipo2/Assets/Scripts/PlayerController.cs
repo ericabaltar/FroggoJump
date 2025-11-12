@@ -201,6 +201,8 @@ public class PlayerController : MonoBehaviour
 
             // Add key to dictionary when pressed
             inputHeldTimes[key.keyCode] = info;
+
+            TurnCharacter(direction);
         }
 
         // If the key is being held (exists in the dictionary)
@@ -224,7 +226,7 @@ public class PlayerController : MonoBehaviour
 
             if (duration > holdTime)
             {
-                Debug.Log("hold detected"); // Feedback for the player to know if the movement will be tap or hold
+                // Feedback for the player to know if the movement will be tap or hold
             }
 
             // When the key is released, remove it from the dictionary and add the input to the buffer
