@@ -110,7 +110,7 @@ public class PlayerController : MonoBehaviour
 
         while (elapsedTime < currentMoveDuration)
         {
-            float percent = elapsedTime / moveDuration;
+            float percent = elapsedTime / baseMoveDuration;
 
             // Interpolación + arco de salto
             Vector3 newPos = Vector3.Lerp(startPos, endPos, percent);
