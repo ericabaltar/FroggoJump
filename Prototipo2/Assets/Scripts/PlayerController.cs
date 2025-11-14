@@ -13,8 +13,6 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private float maxTimeBetweenSameInputs = 0.01f;
     [SerializeField] private float holdTime = 0.5f;
 
-    private float HEIGHT_ABOVE_LILY_PAD = 0.1f;
-
     private enum InputType { Tap, Hold }
 
     private Vector2Int bufferedInputDirection;
@@ -306,7 +304,7 @@ public class PlayerController : MonoBehaviour
     {
         isOnMovingBase = true;
         transform.SetParent(currentMovingBase.transform, true);
-        transform.position = new Vector3(currentMovingBase.transform.position.x, currentMovingBase.transform.position.y + HEIGHT_ABOVE_LILY_PAD, currentMovingBase.transform.position.z);
+        transform.position = new Vector3(currentMovingBase.transform.position.x, currentMovingBase.transform.position.y, currentMovingBase.transform.position.z);
     }
 
 

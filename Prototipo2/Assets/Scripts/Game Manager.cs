@@ -87,7 +87,7 @@ public class GameManager : MonoBehaviour
             // ROAD
             var road = Instantiate(roadPrefab, terrainHolder);
             obstaclePositions = road.Init(spawnLocation);     // normalmente {-6, 6}
-            terrainHeight = 0.1f;
+            terrainHeight = 0.2f;
 
             // Asegurar que la columna del camino está libre
             currentPathX = FindNearestFreeX(desiredPathX, obstaclePositions);
