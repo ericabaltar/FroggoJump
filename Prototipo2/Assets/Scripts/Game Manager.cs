@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -35,6 +36,23 @@ public class GameManager : MonoBehaviour
     [SerializeField] private float movingBaseSpeedMin = 2f;
     [SerializeField] private float movingBaseSpeedMax = 3.5f;
 
+    // ---------- POWERUPS (prefab por tipo) ----------
+    [Header("PowerUps")]
+    [Tooltip("Prefab del powerup de velocidad (debe tener PowerUp con Type=Speed)")]
+    [SerializeField] private PowerUp speedPowerupPrefab;
+    [Range(0f, 1f)][SerializeField] private float speedDropChance = 0.20f;
+
+    [Tooltip("Prefab del powerup de doble salto (debe tener PowerUp con Type=DoubleJump)")]
+    [SerializeField] private PowerUp doubleJumpPowerupPrefab;
+    [Range(0f, 1f)][SerializeField] private float doubleJumpDropChance = 0.12f;
+
+    [Tooltip("Prefab del powerup de doble puntuación (debe tener PowerUp con Type=DoubleScore)")]
+    [SerializeField] private PowerUp doubleScorePowerupPrefab;
+    [Range(0f, 1f)][SerializeField] private float doubleScoreDropChance = 0.08f;
+
+    [Tooltip("Offset local para colocar el powerup sobre la base")]
+    [SerializeField] private Vector3 powerupLocalOffset = new Vector3(0f, 0.35f, 0f);
+
     // obstacles: (isRoad, yHeight, blockedX)
     private List<(bool isRoad, float terrainHeight, HashSet<int> locations)> obstacles = new();
     // posiciones X con BASE ESTÁTICA (las móviles NO se guardan aquí)
@@ -47,6 +65,10 @@ public class GameManager : MonoBehaviour
     // Camino serpenteante garantizado
     private int currentPathX;
     private bool pathInitialized = false;
+
+    // -------- SCORE MULTIPLIER --------
+    private float scoreMultiplier = 1f;
+    private Coroutine scoreMultiplierCoro;
 
     void Awake()
     {
@@ -74,8 +96,8 @@ public class GameManager : MonoBehaviour
 
     private void SpawnObstacle()
     {
-        // Siguiente x del camino (serpenteo) -1,0,1
-        int desiredPathX = currentPathX + Random.Range(-1, 2);
+        // Siguiente x del camino (serpenteo)
+        int desiredPathX = currentPathX + Random.Range(-1, 2); // -1,0,1
         desiredPathX = Mathf.Clamp(desiredPathX, minX, maxX);
 
         float roadProbability = Mathf.Lerp(0.5f, 0.9f, spawnLocation / 250f);
@@ -87,26 +109,24 @@ public class GameManager : MonoBehaviour
         {
             // ROAD
             var road = Instantiate(roadPrefab, terrainHolder);
-            obstaclePositions = road.Init(spawnLocation);     // típicamente {-6, 6}
+            obstaclePositions = road.Init(spawnLocation);
             terrainHeight = 0.2f;
 
-            // Asegurar que la columna del camino está libre
+            // Asegurar columna del camino
             currentPathX = FindNearestFreeX(desiredPathX, obstaclePositions);
 
             obstacles.Add((true, terrainHeight, obstaclePositions));
 
-            // ---- REGLA: una fila ROAD es SOLO de un tipo ----
+            // Una fila ROAD es SOLO de un tipo: móviles o estáticas
             bool rowIsMoving = Random.value < movingRowChance;
 
             if (rowIsMoving)
             {
-                // SOLO MÓVILES (exactamente UNA, para evitar solapes/choques)
                 SpawnMovingRow(spawnLocation, terrainHeight, obstaclePositions, currentPathX);
                 baseLocations.Add(new HashSet<int>()); // no hay estáticas en esta fila
             }
             else
             {
-                // SOLO ESTÁTICAS (incluye la forzada del camino)
                 var staticXs = SpawnStaticRow(spawnLocation, terrainHeight, obstaclePositions, currentPathX);
                 baseLocations.Add(staticXs);
             }
@@ -115,7 +135,6 @@ public class GameManager : MonoBehaviour
         {
             // GRASS
             var grass = Instantiate(grassPrefab, terrainHolder);
-            // Si tu Grass.Init original no recibe desiredPathX, usa la otra firma: grass.Init(spawnLocation);
             obstaclePositions = grass.Init(spawnLocation, desiredPathX); // evita árboles en el camino
             terrainHeight = 0.2f;
 
@@ -145,26 +164,25 @@ public class GameManager : MonoBehaviour
         return Mathf.Clamp(preferredX, minX, maxX);
     }
 
-    /// <summary>
-    /// Fila ROAD SOLO de bases ESTÁTICAS.
-    /// - Garantiza una base estática en forcedPathX (camino).
-    /// - Añade estáticas extra aleatorias (sin pisar obstáculos ni duplicar X).
-    /// </summary>
+    /// Fila ROAD SOLO estáticas
     private HashSet<int> SpawnStaticRow(int z, float yHeight, HashSet<int> blockedPositions, int forcedPathX)
     {
         HashSet<int> staticXs = new();
 
         if (staticBasePrefab == null)
         {
-            Debug.LogWarning("staticBasePrefab sin asignar: no se garantiza camino seguro.");
+            Debug.LogWarning("staticBasePrefab sin asignar.");
             return staticXs;
         }
 
-        // 1) Base estática garantizada (camino)
+        // 1) Camino garantizado
         int fx = blockedPositions.Contains(forcedPathX) ? FindNearestFreeX(forcedPathX, blockedPositions) : forcedPathX;
         Transform b = Instantiate(staticBasePrefab, terrainHolder);
         b.position = new Vector3(fx, yHeight, z);
         staticXs.Add(fx);
+
+        // Powerup sobre esta base (si sale)
+        TrySpawnPowerup(b);
 
         // 2) Estáticas extra
         int targetTotal = Random.Range(minBasesPerRow, maxBasesPerRow + 1);
@@ -180,21 +198,20 @@ public class GameManager : MonoBehaviour
             Transform sb = Instantiate(staticBasePrefab, terrainHolder);
             sb.position = new Vector3(x, yHeight, z);
             staticXs.Add(x);
+
+            // Powerup sobre esta base (si sale)
+            TrySpawnPowerup(sb);
         }
 
         return staticXs;
     }
 
-    /// <summary>
-    /// Fila ROAD SOLO de bases MÓVILES.
-    /// - Garantiza exactamente UNA base móvil en forcedPathX (o la libre más cercana).
-    /// - No spawnea estáticas en esta fila.
-    /// </summary>
+    /// Fila ROAD SOLO móviles (exactamente 1)
     private void SpawnMovingRow(int z, float yHeight, HashSet<int> blockedPositions, int forcedPathX)
     {
         if (movingBasePrefab == null)
         {
-            Debug.LogWarning("movingBasePrefab sin asignar: no se podrán spawnear móviles.");
+            Debug.LogWarning("movingBasePrefab sin asignar.");
             return;
         }
 
@@ -207,7 +224,43 @@ public class GameManager : MonoBehaviour
         bool toRight = Random.value < 0.5f;
         mb.Init(z, yHeight, minX, maxX, toRight, spd, startX);
 
-        // Importante: NO añadimos nada a baseLocations (solo guarda estáticas).
+        // Powerup como HIJO de la base móvil (se mueve con ella)
+        TrySpawnPowerup(mb.transform);
+    }
+
+    // ---------- POWERUP SPAWN (prefab por tipo, 0 o 1 por base) ----------
+    private void TrySpawnPowerup(Transform baseTransform)
+    {
+        if (baseTransform == null) return;
+
+        // Construimos una lista de candidatos activos (prefab + chance)
+        // Para evitar sesgo por orden, aleatorizamos el orden cada vez.
+        var candidates = new List<(PowerUp prefab, float chance)>(3);
+        if (speedPowerupPrefab != null && speedDropChance > 0f) candidates.Add((speedPowerupPrefab, speedDropChance));
+        if (doubleJumpPowerupPrefab != null && doubleJumpDropChance > 0f) candidates.Add((doubleJumpPowerupPrefab, doubleJumpDropChance));
+        if (doubleScorePowerupPrefab != null && doubleScoreDropChance > 0f) candidates.Add((doubleScorePowerupPrefab, doubleScoreDropChance));
+
+        if (candidates.Count == 0) return;
+
+        // Shuffle
+        for (int i = 0; i < candidates.Count; i++)
+        {
+            int j = Random.Range(i, candidates.Count);
+            (candidates[i], candidates[j]) = (candidates[j], candidates[i]);
+        }
+
+        // Probamos en orden aleatorio y spawneamos el primero que “gane” su tirada
+        foreach (var c in candidates)
+        {
+            if (Random.value <= c.chance)
+            {
+                var pu = Instantiate(c.prefab, baseTransform);
+                pu.transform.localPosition = powerupLocalOffset; // encima del nenúfar
+                // Seguridad: es trigger
+                if (pu.TryGetComponent<Collider>(out var col) && !col.isTrigger) col.isTrigger = true;
+                break; // 1 por base
+            }
+        }
     }
 
     public void UpdateFarthestDistance(int distance)
@@ -219,7 +272,8 @@ public class GameManager : MonoBehaviour
                 SpawnObstacle();
         }
 
-        HudManager.Instance?.SetScore(currentFarthestDistance);
+        int shownScore = Mathf.RoundToInt(currentFarthestDistance * scoreMultiplier);
+        HudManager.Instance?.SetScore(shownScore);
     }
 
     public bool CheckIfAccessible(Vector2Int pos)
@@ -247,8 +301,26 @@ public class GameManager : MonoBehaviour
         return obstacles[z].terrainHeight;
     }
 
-    public int GetFarthestDistance()
+    public int GetFarthestDistance() => currentFarthestDistance;
+
+    // ---------- SCORE MULTIPLIER CONTROL ----------
+    public void ActivateScoreMultiplier(float multiplier, float duration)
     {
-        return currentFarthestDistance;
+        if (scoreMultiplierCoro != null) StopCoroutine(scoreMultiplierCoro);
+        scoreMultiplierCoro = StartCoroutine(ScoreMultiplierRoutine(multiplier, duration));
+    }
+
+    private IEnumerator ScoreMultiplierRoutine(float mult, float duration)
+    {
+        scoreMultiplier = Mathf.Max(1f, mult);
+        int shownScore = Mathf.RoundToInt(currentFarthestDistance * scoreMultiplier);
+        HudManager.Instance?.SetScore(shownScore);
+
+        yield return new WaitForSeconds(duration);
+
+        scoreMultiplier = 1f;
+        shownScore = Mathf.RoundToInt(currentFarthestDistance * scoreMultiplier);
+        HudManager.Instance?.SetScore(shownScore);
+        scoreMultiplierCoro = null;
     }
 }

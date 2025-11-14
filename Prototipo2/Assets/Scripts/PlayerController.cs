@@ -26,25 +26,25 @@ public class PlayerController : MonoBehaviour
     }
     private Dictionary<Key, InputInfo> inputHeldTimes = new Dictionary<Key, InputInfo>();
 
-    private enum PlayerState
-    {
-        Ready,
-        Moving,
-        Dead
-    }
-
+    private enum PlayerState { Ready, Moving, Dead }
     private PlayerState state = PlayerState.Ready;
+
     private Vector2Int pos;
 
     float currentMoveDuration;
     int currentStamina;
 
-    // --- Bases m�viles (nen�fares) ---
+    // --- Bases móviles (nenúfares) ---
     private bool isOnMovingBase = false;
     private MovingBase currentMovingBase = null;
 
     // Guardamos el padre previo para restaurarlo si hace falta
     private Transform defaultParent;
+
+    // --- POWERUPS ---
+    private bool doubleJumpActive = false;
+    private Coroutine speedCoro;
+    private float speedOriginalMoveDuration;
 
     void Start()
     {
@@ -55,6 +55,8 @@ public class PlayerController : MonoBehaviour
         currentMoveDuration = baseMoveDuration;
         currentStamina = maxStamina;
 
+        speedOriginalMoveDuration = baseMoveDuration;
+
         defaultParent = transform.parent;
     }
 
@@ -62,17 +64,16 @@ public class PlayerController : MonoBehaviour
     {
         HandleInput();
 
-        // If the user wants to move
+        // Si el jugador quiere moverse
         if (state == PlayerState.Ready && bufferedInputDirection != Vector2Int.zero)
         {
             Vector2Int moveDirection = bufferedInputDirection;
-
             TurnCharacter(moveDirection);
 
-            // Move one or two tiles
+            // TAP = 1 casilla (o 2 si doubleJump activo); HOLD = 2 casillas
             Vector2Int destination;
             if (bufferedInputType == InputType.Tap)
-                destination = pos + moveDirection;
+                destination = pos + (doubleJumpActive ? moveDirection * 2 : moveDirection);
             else
                 destination = pos + moveDirection * 2;
 
@@ -84,7 +85,7 @@ public class PlayerController : MonoBehaviour
 
         if (isOnMovingBase)
         {
-            // Update grid positon
+            // Actualiza pos.x con la plataforma (por si se redondea entre frames)
             pos.x = Mathf.RoundToInt(transform.position.x);
         }
     }
@@ -93,7 +94,7 @@ public class PlayerController : MonoBehaviour
     {
         state = PlayerState.Moving;
 
-        // Si estamos subidos a una base m�vil, soltamos antes de saltar
+        // Si estamos subidos a una base móvil, soltamos antes de saltar
         if (currentMovingBase != null)
         {
             transform.SetParent(defaultParent, true); // mantener world pos
@@ -111,24 +112,20 @@ public class PlayerController : MonoBehaviour
         Vector3 startPos = transform.position;
         Vector3 endPos = new Vector3(destination.x, yHeight, destination.y);
 
-        Quaternion startRotation = transform.localRotation;
+        // Conserva yaw, sin inclinaciones raras
+        float startYaw = transform.localEulerAngles.y;
 
         while (elapsedTime < currentMoveDuration)
         {
-            float percent = elapsedTime / baseMoveDuration;
+            float percent = elapsedTime / currentMoveDuration;
 
             // Interpolación + arco de salto
             Vector3 newPos = Vector3.Lerp(startPos, endPos, percent);
             newPos.y = yHeight + (0.5f * Mathf.Sin(Mathf.PI * percent));
             transform.position = newPos;
 
-            // Pequeño bamboleo en X (como ya tenías)
-            Vector3 rotation = transform.localRotation.eulerAngles;
-            transform.localRotation = Quaternion.Euler(
-                -5f * Mathf.PI * Mathf.Cos(Mathf.PI * percent),
-                rotation.y,
-                rotation.z
-            );
+            // Mantener solo yaw (sin pitch/roll)
+            transform.localRotation = Quaternion.Euler(0f, startYaw, 0f);
 
             elapsedTime += Time.deltaTime;
             yield return null;
@@ -136,12 +133,13 @@ public class PlayerController : MonoBehaviour
 
         // Aseguramos posición final
         transform.position = endPos;
-        transform.localRotation = startRotation;
+        transform.localRotation = Quaternion.Euler(0f, startYaw, 0f);
 
+        // Actualizamos coordenadas grid
         pos = destination;
         GameManager.Instance.UpdateFarthestDistance(destination.y);
 
-        // --- L�GICA DE MUERTE: solo Road sin base est�tica y sin base m�vil ---
+        // --- LÓGICA DE MUERTE: solo Road sin base estática y sin base móvil ---
         bool isRoadRow = GameManager.Instance.IsRoadRow(destination.y);
 
         if (isRoadRow && !GameManager.Instance.HasBaseAt(pos) && !isOnMovingBase)
@@ -156,7 +154,7 @@ public class PlayerController : MonoBehaviour
         {
             state = PlayerState.Ready;
 
-            // Si hemos aterrizado encima de una base m�vil (trigger activo),
+            // Si hemos aterrizado encima de una base móvil (trigger activo),
             // nos volvemos a subir (parentar) para movernos juntos.
             if (isOnMovingBase && currentMovingBase != null)
             {
@@ -182,7 +180,7 @@ public class PlayerController : MonoBehaviour
         {
             bufferTimeLeft -= Time.deltaTime;
 
-            // Remove the save input if enough time has passed
+            // Remove the saved input if enough time has passed
             if (bufferTimeLeft <= 0f)
                 bufferedInputDirection = Vector2Int.zero;
         }
@@ -197,15 +195,11 @@ public class PlayerController : MonoBehaviour
 
     void DetectDirectionalInput(KeyControl key, Vector2Int direction)
     {
+        if (key == null) return;
+
         if (key.wasPressedThisFrame)
         {
-            InputInfo info = new InputInfo
-            {
-                timeHeld = 0f,
-                direction = direction
-            };
-
-            // Add key to dictionary when pressed
+            InputInfo info = new InputInfo { timeHeld = 0f, direction = direction };
             inputHeldTimes[key.keyCode] = info;
 
             if (state == PlayerState.Ready)
@@ -216,7 +210,6 @@ public class PlayerController : MonoBehaviour
 
                 TurnCharacter(currentTotalDirection);
             }
-
         }
 
         // If the key is being held (exists in the dictionary)
@@ -230,17 +223,10 @@ public class PlayerController : MonoBehaviour
             Vector2Int totalMovementDirection = Vector2Int.zero;
             foreach (InputInfo info in inputHeldTimes.Values)
             {
-                // Get duration of the current pressed key that was held longer
                 if (info.timeHeld > duration)
                     duration = info.timeHeld;
 
-                // Get total movement direction
                 totalMovementDirection += info.direction;
-            }
-
-            if (duration > holdTime)
-            {
-                // Feedback for the player to know if the movement will be tap or hold
             }
 
             // When the key is released, remove it from the dictionary and add the input to the buffer
@@ -262,17 +248,16 @@ public class PlayerController : MonoBehaviour
 
     private void Die()
     {
-        if (state == PlayerState.Dead)
-            return;
+        if (state == PlayerState.Dead) return;
 
         state = PlayerState.Dead;
-        transform.SetParent(defaultParent, true); // por si est�bamos parentados
+        transform.SetParent(defaultParent, true); // por si estábamos parentados
         Debug.Log("Has pisado carretera sin base. GAME OVER.");
     }
 
     void TurnCharacter(Vector2Int moveDirection)
     {
-        // Rotaci�n hacia la direcci�n real (incluye diagonales)
+        // Rotación hacia la dirección real (incluye diagonales)
         float yaw = Mathf.Atan2(moveDirection.x, moveDirection.y) * Mathf.Rad2Deg;
         transform.localRotation = Quaternion.Euler(0f, yaw, 0f);
     }
@@ -281,7 +266,6 @@ public class PlayerController : MonoBehaviour
     {
         currentStamina = maxStamina;
         currentMoveDuration = baseMoveDuration;
-
         HudManager.Instance.SetStaminaBar((float)currentStamina / maxStamina);
     }
 
@@ -300,13 +284,17 @@ public class PlayerController : MonoBehaviour
         HudManager.Instance.SetStaminaBar((float)currentStamina / maxStamina);
     }
 
-    void GetOnMovingPlatform(MovingBase currentMovingBase)
+    void GetOnMovingPlatform(MovingBase movingBase)
     {
         isOnMovingBase = true;
+        currentMovingBase = movingBase;
         transform.SetParent(currentMovingBase.transform, true);
-        transform.position = new Vector3(currentMovingBase.transform.position.x, currentMovingBase.transform.position.y, currentMovingBase.transform.position.z);
+        transform.position = new Vector3(
+            currentMovingBase.transform.position.x,
+            currentMovingBase.transform.position.y,
+            currentMovingBase.transform.position.z
+        );
     }
-
 
     // --- Triggers: Fly y MovingBase ---
     private void OnTriggerEnter(Collider other)
@@ -333,7 +321,7 @@ public class PlayerController : MonoBehaviour
     {
         if (other.CompareTag("MovingBase"))
         {
-            // Si sales de la base m�vil, deja de ser su hijo
+            // Si sales de la base móvil, deja de ser su hijo
             if (other.GetComponent<MovingBase>() == currentMovingBase)
             {
                 isOnMovingBase = false;
@@ -341,5 +329,51 @@ public class PlayerController : MonoBehaviour
                 transform.SetParent(defaultParent, true);
             }
         }
+    }
+
+    // ================= POWERUPS (llamados por PowerUp.cs) =================
+
+    /// <summary>
+    /// Aumenta la velocidad reduciendo temporalmente el moveDuration.
+    /// </summary>
+    /// <param name="duration">Duración del efecto (segundos)</param>
+    /// <param name="speedMultiplier">>1 para ir más rápido (p.ej. 1.5)</param>
+    public void ApplySpeedPowerup(float duration, float speedMultiplier)
+    {
+        // velocidad ↑ ⇒ moveDuration ↓
+        float newDuration = Mathf.Max(0.01f, baseMoveDuration / Mathf.Max(0.01f, speedMultiplier));
+
+        if (speedCoro != null) StopCoroutine(speedCoro);
+        speedCoro = StartCoroutine(SpeedPowerRoutine(duration, newDuration));
+    }
+
+    private IEnumerator SpeedPowerRoutine(float duration, float boostedMoveDuration)
+    {
+        float prevBase = baseMoveDuration;
+
+        baseMoveDuration = boostedMoveDuration;
+        currentMoveDuration = baseMoveDuration; // aplica ya si estamos en Ready
+
+        yield return new WaitForSeconds(duration);
+
+        baseMoveDuration = speedOriginalMoveDuration;
+        currentMoveDuration = baseMoveDuration;
+        speedCoro = null;
+    }
+
+    /// <summary>
+    /// Mientras está activo, los TAP saltan 2 casillas.
+    /// </summary>
+    public void ApplyDoubleJumpPowerup(float duration)
+    {
+        StopCoroutine(nameof(DoubleJumpRoutine));
+        StartCoroutine(DoubleJumpRoutine(duration));
+    }
+
+    private IEnumerator DoubleJumpRoutine(float duration)
+    {
+        doubleJumpActive = true;
+        yield return new WaitForSeconds(duration);
+        doubleJumpActive = false;
     }
 }
