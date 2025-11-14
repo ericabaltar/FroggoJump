@@ -7,6 +7,7 @@ using UnityEngine.InputSystem.Controls;
 
 public class PlayerController : MonoBehaviour
 {
+    [SerializeField] private Animator animator;
     [SerializeField] private float baseMoveDuration = 0.2f;
     [SerializeField] private int maxStamina = 15;
     [SerializeField] private float inputBufferTime = 0.15f;
@@ -78,6 +79,7 @@ public class PlayerController : MonoBehaviour
 
             if (GameManager.Instance.CheckIfAccessible(destination))
             {
+                animator.SetTrigger("JumpTrigger");
                 StartCoroutine(MoveCharacter(destination));
             }
         }
