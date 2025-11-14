@@ -13,6 +13,8 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private float maxTimeBetweenSameInputs = 0.01f;
     [SerializeField] private float holdTime = 0.5f;
 
+    private float HEIGHT_ABOVE_LILY_PAD = 0.1f;
+
     private enum InputType { Tap, Hold }
 
     private Vector2Int bufferedInputDirection;
@@ -80,6 +82,12 @@ public class PlayerController : MonoBehaviour
             {
                 StartCoroutine(MoveCharacter(destination));
             }
+        }
+
+        if (isOnMovingBase)
+        {
+            // Update grid positon
+            pos.x = Mathf.RoundToInt(transform.position.x);
         }
     }
 
@@ -154,7 +162,7 @@ public class PlayerController : MonoBehaviour
             // nos volvemos a subir (parentar) para movernos juntos.
             if (isOnMovingBase && currentMovingBase != null)
             {
-                transform.SetParent(currentMovingBase.transform, true); // conservar world pos
+                GetOnMovingPlatform(currentMovingBase);
             }
             else
             {
@@ -294,6 +302,14 @@ public class PlayerController : MonoBehaviour
         HudManager.Instance.SetStaminaBar((float)currentStamina / maxStamina);
     }
 
+    void GetOnMovingPlatform(MovingBase currentMovingBase)
+    {
+        isOnMovingBase = true;
+        transform.SetParent(currentMovingBase.transform, true);
+        transform.position = new Vector3(currentMovingBase.transform.position.x, currentMovingBase.transform.position.y + HEIGHT_ABOVE_LILY_PAD, currentMovingBase.transform.position.z);
+    }
+
+
     // --- Triggers: Fly y MovingBase ---
     private void OnTriggerEnter(Collider other)
     {
@@ -302,7 +318,7 @@ public class PlayerController : MonoBehaviour
             IncreaseStamina();
             Destroy(other.gameObject);
         }
-        else if (other.CompareTag("MovingBase"))
+        else if (!isOnMovingBase && other.CompareTag("MovingBase"))
         {
             isOnMovingBase = true;
             currentMovingBase = other.GetComponent<MovingBase>();
@@ -310,23 +326,7 @@ public class PlayerController : MonoBehaviour
             // Solo nos subimos si no estamos en mitad de un salto
             if (state == PlayerState.Ready && currentMovingBase != null)
             {
-                transform.SetParent(currentMovingBase.transform, true);
-            }
-        }
-    }
-
-    private void OnTriggerStay(Collider other)
-    {
-        if (other.CompareTag("MovingBase"))
-        {
-            isOnMovingBase = true;
-
-            if (currentMovingBase == null)
-                currentMovingBase = other.GetComponent<MovingBase>();
-
-            if (state == PlayerState.Ready && currentMovingBase != null && transform.parent != currentMovingBase.transform)
-            {
-                transform.SetParent(currentMovingBase.transform, true);
+                GetOnMovingPlatform(currentMovingBase);
             }
         }
     }
