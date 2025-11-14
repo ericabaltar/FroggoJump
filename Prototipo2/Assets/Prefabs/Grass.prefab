@@ -56,7 +56,20 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3717cd9d921ec5d4986881b708440805, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  treePrefab: {fileID: 8755271304138863023, guid: d05407ce895017041a50788f4ed37929, type: 3}
+  obstaclePrefabs:
+  - {fileID: 6409589970663677679, guid: 05823d4566dabb4459d513b5f2437289, type: 3}
+  - {fileID: 8271749608572349205, guid: d05407ce895017041a50788f4ed37929, type: 3}
+  - {fileID: 4742201703655968940, guid: 6d958ac03178650419635c28ee2938b6, type: 3}
+  minObstaclesPerRow: 3
+  maxObstaclesPerRow: 6
+  minX: -5
+  maxX: 5
+  localY: 0.2
+  safeRadius: 1
+  randomYRotation: 1
+  randomUniformScale: 0
+  scaleRange: {x: 0.9, y: 1.1}
+  debugLog: 0
 --- !u!1 &5135121727845957070
 GameObject:
   m_ObjectHideFlags: 0
