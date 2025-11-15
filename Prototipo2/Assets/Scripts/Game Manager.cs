@@ -24,11 +24,11 @@ public class GameManager : MonoBehaviour
     [SerializeField] private int minX = -5;
     [SerializeField] private int maxX = 5;
 
-    [Header("Cantidad de bases ESTÁTICAS por fila ROAD")]
+    [Header("Bases ESTÁTICAS por fila ROAD")]
     [SerializeField] private int minBasesPerRow = 2;
     [SerializeField] private int maxBasesPerRow = 4;
 
-    [Header("¿Qué porcentaje de filas ROAD serán MÓVILES? (el resto, ESTÁTICAS)")]
+    [Header("¿Qué % de filas ROAD serán MÓVILES? (resto: ESTÁTICAS)")]
     [Range(0f, 1f)]
     [SerializeField] private float movingRowChance = 0.45f;
 
@@ -36,47 +36,54 @@ public class GameManager : MonoBehaviour
     [SerializeField] private float movingBaseSpeedMin = 2f;
     [SerializeField] private float movingBaseSpeedMax = 3.5f;
 
-    // ---------- POWERUPS (prefab por tipo) ----------
-    [Header("PowerUps")]
-    [Tooltip("Prefab del powerup de velocidad (debe tener PowerUp con Type=Speed)")]
-    [SerializeField] private PowerUp speedPowerupPrefab;
-    [Range(0f, 1f)][SerializeField] private float speedDropChance = 0.20f;
+    // ---------- POWERUPS (prefab por tipo NUEVOS) ----------
+    [Header("PowerUps (nuevos)")]
+    [SerializeField] private PowerUp megaJumpPrefab;
+    [Range(0f, 1f)][SerializeField] private float megaJumpDropChance = 0.12f;
 
-    [Tooltip("Prefab del powerup de doble salto (debe tener PowerUp con Type=DoubleJump)")]
-    [SerializeField] private PowerUp doubleJumpPowerupPrefab;
-    [Range(0f, 1f)][SerializeField] private float doubleJumpDropChance = 0.12f;
+    [SerializeField] private PowerUp slowSpeedPrefab;
+    [Range(0f, 1f)][SerializeField] private float slowSpeedDropChance = 0.10f;
 
-    [Tooltip("Prefab del powerup de doble puntuación (debe tener PowerUp con Type=DoubleScore)")]
-    [SerializeField] private PowerUp doubleScorePowerupPrefab;
-    [Range(0f, 1f)][SerializeField] private float doubleScoreDropChance = 0.08f;
+    [SerializeField] private PowerUp fastSpeedPrefab;
+    [Range(0f, 1f)][SerializeField] private float fastSpeedDropChance = 0.16f;
 
-    [Tooltip("Offset local para colocar el powerup sobre la base")]
+    [SerializeField] private PowerUp slowStaminaPrefab;
+    [Range(0f, 1f)][SerializeField] private float slowStaminaDropChance = 0.12f;
+
+    [SerializeField] private PowerUp extraLifePrefab;
+    [Range(0f, 1f)][SerializeField] private float extraLifeDropChance = 0.06f;
+
+    [Tooltip("Offset local para colocar el powerup encima de la base")]
     [SerializeField] private Vector3 powerupLocalOffset = new Vector3(0f, 0.35f, 0f);
 
     // ---------- FLIES (stamina pickups) ----------
-    [Header("Flies (stamina pickups) - Opción A (GameObject)")]
-    [SerializeField] private GameObject flyPrefab;  // GameObject para que puedas arrastrar cualquier prefab
-    [Tooltip("Número mínimo/máximo de moscas a intentar por fila.")]
+    [Header("Flies (stamina pickups) - suelo")]
+    [SerializeField] private GameObject flyPrefab;     // GameObject a prueba de balas
     [SerializeField] private int fliesPerRowMin = 0;
     [SerializeField] private int fliesPerRowMax = 2;
-    [Tooltip("Probabilidad de spawnear cada intentona de mosca en la fila.")]
     [Range(0f, 1f)][SerializeField] private float flySpawnChance = 0.6f;
-    [Tooltip("Altura visual por encima del terreno para las moscas.")]
     [SerializeField] private float flyYOffset = 0.45f;
 
+    [Header("Flies sobre bases")]
+    [Range(0f, 1f)][SerializeField] private float flyOnBaseChance = 0.35f;
+    [SerializeField] private Vector3 flyOnBaseLocalOffset = new Vector3(0f, 0.45f, 0f);
+
+    // ---------- VIDAS ----------
+    [Header("Vidas")]
+    [SerializeField] private int startingExtraLives = 0;
+    private int extraLives = 0;
+
     // obstacles: (isRoad, yHeight, blockedX)
-    private List<(bool isRoad, float terrainHeight, HashSet<int> locations)> obstacles = new();
-    // posiciones X con BASE ESTÁTICA (las móviles NO se guardan aquí)
-    private List<HashSet<int>> baseLocations = new();
+    private readonly List<(bool isRoad, float terrainHeight, HashSet<int> locations)> obstacles = new();
+    private readonly List<HashSet<int>> baseLocations = new();
 
     private int spawnLocation;
     private int currentFarthestDistance = 0;
     public static GameManager Instance { get; private set; }
 
-    // Camino serpenteante garantizado
     private int currentPathX;
 
-    // -------- SCORE MULTIPLIER --------
+    // -------- SCORE MULTIPLIER (si lo usas para otra cosa) --------
     private float scoreMultiplier = 1f;
     private Coroutine scoreMultiplierCoro;
 
@@ -100,15 +107,14 @@ public class GameManager : MonoBehaviour
 
         currentPathX = Mathf.Clamp(0, minX, maxX);
 
+        extraLives = startingExtraLives;
+
         for (int i = 0; i < spawnDistance; i++) SpawnObstacle();
     }
 
     private void SpawnObstacle()
     {
-        // Siguiente x del camino (serpenteo)
-        int desiredPathX = currentPathX + Random.Range(-1, 2); // -1,0,1
-        desiredPathX = Mathf.Clamp(desiredPathX, minX, maxX);
-
+        int desiredPathX = Mathf.Clamp(currentPathX + Random.Range(-1, 2), minX, maxX);
         float roadProbability = Mathf.Lerp(0.5f, 0.9f, spawnLocation / 250f);
 
         float terrainHeight;
@@ -118,21 +124,19 @@ public class GameManager : MonoBehaviour
         {
             // ROAD
             var road = Instantiate(roadPrefab, terrainHolder);
-            obstaclePositions = road.Init(spawnLocation); // típicamente {-6, 6}
+            obstaclePositions = road.Init(spawnLocation);
             terrainHeight = 0.2f;
 
-            // Asegurar que la columna del camino está libre
             currentPathX = FindNearestFreeX(desiredPathX, obstaclePositions);
 
             obstacles.Add((true, terrainHeight, obstaclePositions));
 
-            // Una fila ROAD es SOLO de un tipo: móviles o estáticas
             bool rowIsMoving = Random.value < movingRowChance;
 
             if (rowIsMoving)
             {
                 SpawnMovingRow(spawnLocation, terrainHeight, obstaclePositions, currentPathX);
-                baseLocations.Add(new HashSet<int>()); // no hay estáticas en esta fila
+                baseLocations.Add(new HashSet<int>());
             }
             else
             {
@@ -140,22 +144,20 @@ public class GameManager : MonoBehaviour
                 baseLocations.Add(staticXs);
             }
 
-            // Moscas en road
             SpawnFliesInRow(spawnLocation, terrainHeight, obstaclePositions);
         }
         else
         {
             // GRASS
             var grass = Instantiate(grassPrefab, terrainHolder);
-            obstaclePositions = grass.Init(spawnLocation, desiredPathX); // evita obstáculos en el camino
+            obstaclePositions = grass.Init(spawnLocation, desiredPathX);
             terrainHeight = 0.2f;
 
             currentPathX = desiredPathX;
 
             obstacles.Add((false, terrainHeight, obstaclePositions));
-            baseLocations.Add(new HashSet<int>()); // sin bases en grass
+            baseLocations.Add(new HashSet<int>());
 
-            // Moscas en grass
             SpawnFliesInRow(spawnLocation, terrainHeight, obstaclePositions);
         }
 
@@ -170,16 +172,13 @@ public class GameManager : MonoBehaviour
         {
             int left = preferredX - offset;
             int right = preferredX + offset;
-
             if (left >= minX && !blocked.Contains(left)) return left;
             if (right <= maxX && !blocked.Contains(right)) return right;
         }
-
-        Debug.LogWarning("No X libre para camino en fila " + spawnLocation);
         return Mathf.Clamp(preferredX, minX, maxX);
     }
 
-    /// Fila ROAD SOLO estáticas
+    // ---------- Filas estáticas ----------
     private HashSet<int> SpawnStaticRow(int z, float yHeight, HashSet<int> blockedPositions, int forcedPathX)
     {
         HashSet<int> staticXs = new();
@@ -196,10 +195,10 @@ public class GameManager : MonoBehaviour
         b.position = new Vector3(fx, yHeight, z);
         staticXs.Add(fx);
 
-        // Powerup sobre esta base (si sale)
         TrySpawnPowerup(b);
+        TrySpawnFlyOnBase(b);
 
-        // 2) Estáticas extra
+        // 2) Extras
         int targetTotal = Random.Range(minBasesPerRow, maxBasesPerRow + 1);
         int attempts = 0;
 
@@ -214,14 +213,14 @@ public class GameManager : MonoBehaviour
             sb.position = new Vector3(x, yHeight, z);
             staticXs.Add(x);
 
-            // Powerup sobre esta base (si sale)
             TrySpawnPowerup(sb);
+            TrySpawnFlyOnBase(sb);
         }
 
         return staticXs;
     }
 
-    /// Fila ROAD SOLO móviles (exactamente 1)
+    // ---------- Fila móvil (exactamente 1) ----------
     private void SpawnMovingRow(int z, float yHeight, HashSet<int> blockedPositions, int forcedPathX)
     {
         if (movingBasePrefab == null)
@@ -239,23 +238,25 @@ public class GameManager : MonoBehaviour
         bool toRight = Random.value < 0.5f;
         mb.Init(z, yHeight, minX, maxX, toRight, spd, startX);
 
-        // Powerup como HIJO de la base móvil (se mueve con ella)
         TrySpawnPowerup(mb.transform);
+        TrySpawnFlyOnBase(mb.transform);
     }
 
-    // ---------- POWERUP SPAWN (prefab por tipo, 0 o 1 por base) ----------
+    // ---------- Spawn de PowerUps (prefab por tipo, 0 o 1 por base) ----------
     private void TrySpawnPowerup(Transform baseTransform)
     {
         if (baseTransform == null) return;
 
-        var candidates = new List<(PowerUp prefab, float chance)>(3);
-        if (speedPowerupPrefab != null && speedDropChance > 0f) candidates.Add((speedPowerupPrefab, speedDropChance));
-        if (doubleJumpPowerupPrefab != null && doubleJumpDropChance > 0f) candidates.Add((doubleJumpPowerupPrefab, doubleJumpDropChance));
-        if (doubleScorePowerupPrefab != null && doubleScoreDropChance > 0f) candidates.Add((doubleScorePowerupPrefab, doubleScoreDropChance));
+        var candidates = new List<(PowerUp prefab, float chance)>(5);
+        if (megaJumpPrefab != null && megaJumpDropChance > 0f) candidates.Add((megaJumpPrefab, megaJumpDropChance));
+        if (slowSpeedPrefab != null && slowSpeedDropChance > 0f) candidates.Add((slowSpeedPrefab, slowSpeedDropChance));
+        if (fastSpeedPrefab != null && fastSpeedDropChance > 0f) candidates.Add((fastSpeedPrefab, fastSpeedDropChance));
+        if (slowStaminaPrefab != null && slowStaminaDropChance > 0f) candidates.Add((slowStaminaPrefab, slowStaminaDropChance));
+        if (extraLifePrefab != null && extraLifeDropChance > 0f) candidates.Add((extraLifePrefab, extraLifeDropChance));
 
         if (candidates.Count == 0) return;
 
-        // Shuffle
+        // Shuffle simple para evitar sesgo
         for (int i = 0; i < candidates.Count; i++)
         {
             int j = Random.Range(i, candidates.Count);
@@ -267,78 +268,74 @@ public class GameManager : MonoBehaviour
             if (Random.value <= c.chance)
             {
                 var pu = Instantiate(c.prefab, baseTransform);
-                pu.transform.localPosition = powerupLocalOffset; // encima del nenúfar
+                pu.transform.localPosition = powerupLocalOffset;
+
                 if (pu.TryGetComponent<Collider>(out var col) && !col.isTrigger) col.isTrigger = true;
                 break; // 1 por base
             }
         }
     }
 
-    // ---------- FLIES: spawner por fila (GameObject) ----------
-    private void SpawnFliesInRow(int z, float yHeight, HashSet<int> blockedPositions)
+    // ---------- Flies SOBRE bases ----------
+    private void TrySpawnFlyOnBase(Transform baseTransform)
     {
-        if (flyPrefab == null)
+        if (flyPrefab == null || baseTransform == null) return;
+        if (Random.value > flyOnBaseChance) return;
+
+        var go = Instantiate(flyPrefab, baseTransform);
+        go.SetActive(true);
+        go.transform.localPosition = flyOnBaseLocalOffset;
+
+        var fly = go.GetComponent<Fly>();
+        if (fly == null) fly = go.AddComponent<Fly>();
+
+        var col = go.GetComponent<Collider>();
+        if (col == null) col = go.AddComponent<SphereCollider>();
+        col.isTrigger = true;
+
+        if (col is SphereCollider sc)
         {
-            Debug.LogWarning("[GameManager] flyPrefab no asignado: no se spawnean moscas.");
-            return;
+            if (sc.radius < 0.05f) sc.radius = Mathf.Max(0.3f, fly.pickupRadius);
+            sc.center = Vector3.zero;
         }
 
-        int tries = Random.Range(fliesPerRowMin, fliesPerRowMax + 1);
+        if (go.tag == "Untagged") go.tag = "Fly";
+    }
 
+    // ---------- Flies en SUELO ----------
+    private void SpawnFliesInRow(int z, float yHeight, HashSet<int> blockedPositions)
+    {
+        if (flyPrefab == null) return;
+
+        int tries = Random.Range(fliesPerRowMin, fliesPerRowMax + 1);
         for (int i = 0; i < tries; i++)
         {
             if (Random.value > flySpawnChance) continue;
 
             int x = Random.Range(minX, maxX + 1);
-            // Si quieres evitar obstáculo exacto, descomenta:
-            // if (blockedPositions.Contains(x)) continue;
 
             var go = Instantiate(flyPrefab, terrainHolder);
-            // Asegura que la instancia queda ACTIVA
             go.SetActive(true);
-
-            // Posición en mundo (altura un poco por encima del terreno)
             go.transform.position = new Vector3(x, yHeight + flyYOffset, z);
 
-            // Garantiza el componente Fly
             var fly = go.GetComponent<Fly>();
             if (fly == null) fly = go.AddComponent<Fly>();
 
-            // Garantiza un Collider trigger (SphereCollider por defecto)
             var col = go.GetComponent<Collider>();
             if (col == null) col = go.AddComponent<SphereCollider>();
             col.isTrigger = true;
 
             if (col is SphereCollider sc)
             {
-                // Si el radio es ínfimo, usa el pickupRadius del script
                 if (sc.radius < 0.05f) sc.radius = Mathf.Max(0.3f, fly.pickupRadius);
                 sc.center = Vector3.zero;
             }
 
-            // Si no hay ningún renderer visible, crea un marcador visual de emergencia
-            bool hasRenderer = go.GetComponentInChildren<Renderer>() != null;
-            if (!hasRenderer)
-            {
-                var marker = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-                marker.transform.SetParent(go.transform, worldPositionStays: false);
-                marker.transform.localPosition = Vector3.zero;
-                marker.transform.localScale = Vector3.one * 0.35f;
-
-                // Evita colisiones sólidas del marcador
-                var mc = marker.GetComponent<Collider>();
-                if (mc) Destroy(mc);
-            }
-
-            // Tag de seguridad
             if (go.tag == "Untagged") go.tag = "Fly";
-
-            Debug.Log($"[GameManager] Fly @ (x={x}, z={z}) y={yHeight + flyYOffset}");
         }
     }
 
-
-    // ---------- SCORE / HUD ----------
+    // ---------- Score / HUD ----------
     public void UpdateFarthestDistance(int distance)
     {
         if (distance > currentFarthestDistance)
@@ -352,14 +349,14 @@ public class GameManager : MonoBehaviour
         HudManager.Instance?.SetScore(shownScore);
     }
 
-    // ---------- QUERIES ----------
+    // ---------- Queries ----------
     public bool CheckIfAccessible(Vector2Int pos)
     {
         if (pos.y < 0 || pos.y >= obstacles.Count) return false;
         return !obstacles[pos.y].locations.Contains(pos.x);
     }
 
-    // Solo devuelve true para bases ESTÁTICAS
+    // Solo bases ESTÁTICAS
     public bool HasBaseAt(Vector2Int pos)
     {
         if (pos.y < 0 || pos.y >= baseLocations.Count) return false;
@@ -380,7 +377,22 @@ public class GameManager : MonoBehaviour
 
     public int GetFarthestDistance() => currentFarthestDistance;
 
-    // ---------- SCORE MULTIPLIER CONTROL ----------
+    // ---------- Vidas ----------
+    public void GrantExtraLife(int count = 1)
+    {
+        extraLives += Mathf.Max(1, count);
+        // TODO: actualizar HUD si tienes iconos de vidas
+    }
+
+    public bool TryConsumeExtraLife()
+    {
+        if (extraLives <= 0) return false;
+        extraLives--;
+        // TODO: HUD
+        return true;
+    }
+
+    // ---------- (Opcional) Score multiplier si lo seguías usando ----------
     public void ActivateScoreMultiplier(float multiplier, float duration)
     {
         if (scoreMultiplierCoro != null) StopCoroutine(scoreMultiplierCoro);
@@ -390,14 +402,10 @@ public class GameManager : MonoBehaviour
     private IEnumerator ScoreMultiplierRoutine(float mult, float duration)
     {
         scoreMultiplier = Mathf.Max(1f, mult);
-        int shownScore = Mathf.RoundToInt(currentFarthestDistance * scoreMultiplier);
-        HudManager.Instance?.SetScore(shownScore);
-
+        HudManager.Instance?.SetScore(Mathf.RoundToInt(currentFarthestDistance * scoreMultiplier));
         yield return new WaitForSeconds(duration);
-
         scoreMultiplier = 1f;
-        shownScore = Mathf.RoundToInt(currentFarthestDistance * scoreMultiplier);
-        HudManager.Instance?.SetScore(shownScore);
+        HudManager.Instance?.SetScore(Mathf.RoundToInt(currentFarthestDistance * scoreMultiplier));
         scoreMultiplierCoro = null;
     }
 }

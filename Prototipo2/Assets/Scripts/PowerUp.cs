@@ -1,60 +1,69 @@
 using UnityEngine;
 
+public enum PowerUpType
+{
+    MegaJump,          // Como las botas de Subway Surfers
+    SlowSpeed,         // Reducir velocidad del jugador
+    FastSpeed,         // Aumentar velocidad del jugador
+    SlowStaminaDrain,  // La estamina se gasta más lento
+    ExtraLife          // Vida extra (uso único)
+}
+
 [RequireComponent(typeof(Collider))]
 public class PowerUp : MonoBehaviour
 {
-    public enum PowerUpType
-    {
-        Speed,          
-        DoubleJump,     
-        DoubleScore     
-    }
+    [Header("Tipo")]
+    public PowerUpType type = PowerUpType.MegaJump;
 
-    [Header("Config")]
-    public PowerUpType type = PowerUpType.Speed;
-    [Tooltip("Duración del efecto en segundos.")]
+    [Header("Duración (si aplica)")]
     public float duration = 6f;
 
-    [Header("Velocidad")]
-    [Tooltip("Multiplica la velocidad. Ej: 1.5 => 50% más rápido. Internamente reduce moveDuration.")]
-    public float speedMultiplier = 1.5f;
+    [Header("Parámetros de velocidad")]
+    [Tooltip("Multiplicador de velocidad (>1 más rápido, <1 más lento). Se usa en Fast/Slow Speed")]
+    public float speedMultiplier = 1.5f;   // FastSpeed: 1.5, SlowSpeed: 0.6 por ejemplo
 
-    [Header("Visual/FX")]
-    public bool rotateIdle = true;
-    public float rotateSpeed = 90f; 
+    [Header("Parámetros de estamina")]
+    [Tooltip("Multiplicador del gasto de estamina (<1 gasta menos). Ej: 0.5 = gasta la mitad")]
+    public float staminaDrainMultiplier = 0.5f;
+
+    [Header("Vidas")]
+    public int extraLives = 1;
 
     private void Reset()
     {
         var col = GetComponent<Collider>();
         col.isTrigger = true;
-        gameObject.tag = "PowerUp";
-    }
-
-    private void Update()
-    {
-        if (rotateIdle)
-            transform.Rotate(0f, rotateSpeed * Time.deltaTime, 0f, Space.World);
+        if (gameObject.tag == "Untagged") gameObject.tag = "PowerUp";
     }
 
     private void OnTriggerEnter(Collider other)
     {
-        var player = other.GetComponentInParent<PlayerController>();
+        var player = other.GetComponent<PlayerController>();
         if (player == null) return;
 
         switch (type)
         {
-            case PowerUpType.Speed:
-                player.ApplySpeedPowerup(duration, speedMultiplier);
+            case PowerUpType.MegaJump:
+                player.ApplyMegaJump(duration);
                 break;
-            case PowerUpType.DoubleJump:
-                player.ApplyDoubleJumpPowerup(duration);
+
+            case PowerUpType.SlowSpeed:
+                player.ApplySpeedMultiplier(duration, Mathf.Max(0.05f, speedMultiplier)); // <1 = más lento
                 break;
-            case PowerUpType.DoubleScore:
-                GameManager.Instance?.ActivateScoreMultiplier(2f, duration);
+
+            case PowerUpType.FastSpeed:
+                player.ApplySpeedMultiplier(duration, Mathf.Max(0.05f, speedMultiplier)); // >1 = más rápido
+                break;
+
+            case PowerUpType.SlowStaminaDrain:
+                player.ApplyStaminaDrainModifier(duration, Mathf.Clamp(staminaDrainMultiplier, 0.05f, 1f));
+                break;
+
+            case PowerUpType.ExtraLife:
+                GameManager.Instance?.GrantExtraLife(extraLives);
                 break;
         }
 
         Destroy(gameObject);
     }
 }
-

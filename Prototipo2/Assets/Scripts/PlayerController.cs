@@ -10,7 +10,6 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private float baseMoveDuration = 0.2f;
     [SerializeField] private int maxStamina = 15;
     [SerializeField] private float inputBufferTime = 0.15f;
-    [SerializeField] private float maxTimeBetweenSameInputs = 0.01f;
     [SerializeField] private float holdTime = 0.5f;
 
     private enum InputType { Tap, Hold }
@@ -20,7 +19,7 @@ public class PlayerController : MonoBehaviour
     private float bufferTimeLeft = 0f;
 
     struct InputInfo { public float timeHeld; public Vector2Int direction; }
-    private Dictionary<Key, InputInfo> inputHeldTimes = new Dictionary<Key, InputInfo>();
+    private readonly Dictionary<Key, InputInfo> inputHeldTimes = new();
 
     private enum PlayerState { Ready, Moving, Dead }
     private PlayerState state = PlayerState.Ready;
@@ -30,47 +29,50 @@ public class PlayerController : MonoBehaviour
     float currentMoveDuration;
     int currentStamina;
 
-    // --- Bases móviles (nenúfares) ---
+    // Plataformas móviles
     private bool isOnMovingBase = false;
     private MovingBase currentMovingBase = null;
 
     private Transform defaultParent;
 
-    // --------- POWERUPS ---------
-    // Velocidad
-    private Coroutine speedCoro;
+    // --------- POWERUPS / EFECTOS ---------
+    // Velocidad: moveDuration = original / speedMultiplier
+    private float speedMultiplier = 1f;
     private float originalBaseMoveDuration;
+    private Coroutine speedCoro;
 
-    // Doble salto (TAP = 2 casillas mientras dure)
-    private bool doubleJumpActive = false;
-    private Coroutine doubleJumpCoro;
+    // Mega salto: +1 casilla a Tap/Hold y no muere en road mientras dura
+    private bool megaJumpActive = false;
+    private Coroutine megaCoro;
+
+    // Estamina se gasta más lento (factor de 0.05 a 1). 0.5 = gasta la mitad
+    private float staminaDrainMultiplier = 1f;
+    private float staminaResidue = 0f; // acumula gasto fraccional
+    private Coroutine staminaCoro;
 
     void Start()
     {
         pos = new Vector2Int(0, 0);
         transform.position = new Vector3(0, 0.2f, 0);
 
-        currentMoveDuration = baseMoveDuration;
         originalBaseMoveDuration = baseMoveDuration;
-
+        currentMoveDuration = baseMoveDuration;
         currentStamina = maxStamina;
 
         defaultParent = transform.parent;
 
-        HudManager.Instance?.SetStaminaBar((float)currentStamina / maxStamina);
+        if (HudManager.Instance != null)
+            HudManager.Instance.SetStaminaBar((float)currentStamina / maxStamina);
     }
 
     void Update()
     {
         HandleInput();
 
-        // Si no hay stamina, no aceptamos saltos
+        // Sin stamina no se aceptan saltos
         if (currentStamina <= 0)
-        {
             bufferedInputDirection = Vector2Int.zero;
-        }
 
-        // Intento de movimiento
         if (state == PlayerState.Ready && bufferedInputDirection != Vector2Int.zero)
         {
             if (currentStamina <= 0) return;
@@ -78,11 +80,11 @@ public class PlayerController : MonoBehaviour
             Vector2Int moveDirection = bufferedInputDirection;
             TurnCharacter(moveDirection);
 
-            // TAP = 1 casilla (o 2 si doubleJumpActive); HOLD = 2 casillas
-            Vector2Int destination =
-                (bufferedInputType == InputType.Tap)
-                ? pos + (doubleJumpActive ? moveDirection * 2 : moveDirection)
-                : pos + moveDirection * 2;
+            // Distancia: normal Tap=1, Hold=2. Con MegaJump, +1 casilla
+            int tiles = (bufferedInputType == InputType.Tap) ? 1 : 2;
+            if (megaJumpActive) tiles += 1;
+
+            Vector2Int destination = pos + moveDirection * tiles;
 
             if (GameManager.Instance.CheckIfAccessible(destination))
             {
@@ -91,21 +93,16 @@ public class PlayerController : MonoBehaviour
         }
 
         if (isOnMovingBase)
-        {
-            // Seguir X de la plataforma para mantener coherencia con la grid
             pos.x = Mathf.RoundToInt(transform.position.x);
-        }
     }
 
     private IEnumerator MoveCharacter(Vector2Int destination)
     {
         state = PlayerState.Moving;
 
-        // Suelta plataforma antes de saltar
+        // Soltar plataforma antes de saltar
         if (currentMovingBase != null)
-        {
             transform.SetParent(defaultParent, true);
-        }
 
         float elapsedTime = 0f;
 
@@ -123,10 +120,10 @@ public class PlayerController : MonoBehaviour
             float percent = elapsedTime / currentMoveDuration;
 
             Vector3 newPos = Vector3.Lerp(startPos, endPos, percent);
-            newPos.y = yHeight + (0.5f * Mathf.Sin(Mathf.PI * percent));
+            float arc = megaJumpActive ? 0.9f : 0.5f; // arco más alto con mega salto
+            newPos.y = yHeight + (arc * Mathf.Sin(Mathf.PI * percent));
             transform.position = newPos;
 
-            // Mantén solo yaw (sin pitch/roll)
             transform.localRotation = Quaternion.Euler(0f, startYaw, 0f);
 
             elapsedTime += Time.deltaTime;
@@ -136,16 +133,16 @@ public class PlayerController : MonoBehaviour
         transform.position = endPos;
         transform.localRotation = Quaternion.Euler(0f, startYaw, 0f);
 
-        // Consumir stamina por salto
+        // Gasto de estamina por salto (con multiplicador de gasto)
         DecreaseStamina(1);
 
-        // Actualiza grid
+        // Actualiza grid y score
         pos = destination;
         GameManager.Instance.UpdateFarthestDistance(destination.y);
 
-        // Muerte solo Road sin base estática ni móvil
+        // Muerte en road solo si NO hay base estática, NO hay base móvil y NO hay mega salto activo
         bool isRoadRow = GameManager.Instance.IsRoadRow(destination.y);
-        if (isRoadRow && !GameManager.Instance.HasBaseAt(pos) && !isOnMovingBase)
+        if (isRoadRow && !GameManager.Instance.HasBaseAt(pos) && !isOnMovingBase && !megaJumpActive)
         {
             Die();
             yield break;
@@ -194,27 +191,23 @@ public class PlayerController : MonoBehaviour
 
             if (state == PlayerState.Ready)
             {
-                Vector2Int currentTotalDirection = Vector2Int.zero;
-                foreach (InputInfo infoo in inputHeldTimes.Values)
-                    currentTotalDirection += infoo.direction;
-
-                TurnCharacter(currentTotalDirection);
+                Vector2Int total = Vector2Int.zero;
+                foreach (var kv in inputHeldTimes) total += kv.Value.direction;
+                TurnCharacter(total);
             }
         }
 
-        if (inputHeldTimes.TryGetValue(key.keyCode, out InputInfo inputInfo))
+        if (inputHeldTimes.TryGetValue(key.keyCode, out InputInfo info))
         {
-            inputInfo.timeHeld += Time.deltaTime;
-            inputHeldTimes[key.keyCode] = inputInfo;
+            info.timeHeld += Time.deltaTime;
+            inputHeldTimes[key.keyCode] = info;
 
             float duration = 0f;
-            Vector2Int totalMovementDirection = Vector2Int.zero;
-            foreach (InputInfo info in inputHeldTimes.Values)
+            Vector2Int totalDir = Vector2Int.zero;
+            foreach (var kv in inputHeldTimes)
             {
-                if (info.timeHeld > duration)
-                    duration = info.timeHeld;
-
-                totalMovementDirection += info.direction;
+                if (kv.Value.timeHeld > duration) duration = kv.Value.timeHeld;
+                totalDir += kv.Value.direction;
             }
 
             if (key.wasReleasedThisFrame)
@@ -222,24 +215,32 @@ public class PlayerController : MonoBehaviour
                 inputHeldTimes.Clear();
 
                 if (duration < holdTime)
-                    AddInputToBuffer(totalMovementDirection, InputType.Tap);
+                    AddInputToBuffer(totalDir, InputType.Tap);
                 else
-                    AddInputToBuffer(totalMovementDirection, InputType.Hold);
+                    AddInputToBuffer(totalDir, InputType.Hold);
             }
         }
     }
 
     private void Die()
     {
-        if (state == PlayerState.Dead) return;
+        // Vida extra: si hay, evita la muerte
+        if (GameManager.Instance != null && GameManager.Instance.TryConsumeExtraLife())
+        {
+            state = PlayerState.Ready;
+            transform.SetParent(defaultParent, true);
+            return;
+        }
 
+        if (state == PlayerState.Dead) return;
         state = PlayerState.Dead;
         transform.SetParent(defaultParent, true);
-        Debug.Log("Has pisado carretera sin base. GAME OVER.");
+        Debug.Log("Has muerto.");
     }
 
     void TurnCharacter(Vector2Int moveDirection)
     {
+        if (moveDirection == Vector2Int.zero) return;
         float yaw = Mathf.Atan2(moveDirection.x, moveDirection.y) * Mathf.Rad2Deg;
         transform.localRotation = Quaternion.Euler(0f, yaw, 0f);
     }
@@ -248,15 +249,22 @@ public class PlayerController : MonoBehaviour
     private void SetStamina(int value)
     {
         currentStamina = Mathf.Clamp(value, 0, maxStamina);
-        HudManager.Instance?.SetStaminaBar((float)currentStamina / maxStamina);
+        if (HudManager.Instance != null)
+            HudManager.Instance.SetStaminaBar((float)currentStamina / maxStamina);
     }
 
-    private void DecreaseStamina(int amount)
+    private void DecreaseStamina(int baseCost)
     {
-        SetStamina(currentStamina - Mathf.Abs(amount));
-        if (currentStamina <= 0)
+        // Aplica multiplicador de gasto y acumula residuo fraccional.
+        // Por ejemplo, con factor 0.5 cada salto gasta 0.5 y en 2 saltos gasta 1.
+        float effective = baseCost * Mathf.Max(0.05f, staminaDrainMultiplier);
+        staminaResidue += effective;
+
+        int spend = Mathf.FloorToInt(staminaResidue);
+        if (spend > 0)
         {
-            // feedback opcional al quedarte sin stamina
+            staminaResidue -= spend;
+            SetStamina(currentStamina - spend);
         }
     }
 
@@ -307,49 +315,58 @@ public class PlayerController : MonoBehaviour
         }
     }
 
-    // ================= POWERUPS (llamados por PowerUp.cs) =================
+    // ================== MÉTODOS PARA POWERUPS ==================
 
-    /// <summary>
-    /// Aumenta la velocidad reduciendo temporalmente el moveDuration.
-    /// speedMultiplier > 1 ⇒ más rápido.
-    /// </summary>
-    public void ApplySpeedPowerup(float duration, float speedMultiplier)
+    // Cambia la velocidad durante un tiempo: moveDuration = original / multiplier
+    // multiplier > 1 acelera; multiplier < 1 desacelera
+    public void ApplySpeedMultiplier(float duration, float multiplier)
     {
-        if (speedMultiplier <= 0f) speedMultiplier = 1f;
-
-        // Reducimos la duración por salto (más velocidad)
-        float boosted = Mathf.Max(0.01f, originalBaseMoveDuration / speedMultiplier);
-
         if (speedCoro != null) StopCoroutine(speedCoro);
-        speedCoro = StartCoroutine(SpeedPowerRoutine(duration, boosted));
+        speedCoro = StartCoroutine(SpeedRoutine(duration, Mathf.Max(0.05f, multiplier)));
     }
 
-    private IEnumerator SpeedPowerRoutine(float duration, float boostedMoveDuration)
+    private IEnumerator SpeedRoutine(float duration, float multiplier)
     {
-        baseMoveDuration = boostedMoveDuration;
+        speedMultiplier = multiplier;
+        baseMoveDuration = originalBaseMoveDuration / speedMultiplier;
         currentMoveDuration = baseMoveDuration;
 
         yield return new WaitForSeconds(duration);
 
+        speedMultiplier = 1f;
         baseMoveDuration = originalBaseMoveDuration;
         currentMoveDuration = baseMoveDuration;
         speedCoro = null;
     }
 
-    /// <summary>
-    /// Mientras está activo, los TAP saltan 2 casillas.
-    /// </summary>
-    public void ApplyDoubleJumpPowerup(float duration)
+    // Mega salto estilo Subway Surfers: +1 casilla y no muere al caer en road mientras dure.
+    public void ApplyMegaJump(float duration)
     {
-        if (doubleJumpCoro != null) StopCoroutine(doubleJumpCoro);
-        doubleJumpCoro = StartCoroutine(DoubleJumpRoutine(duration));
+        if (megaCoro != null) StopCoroutine(megaCoro);
+        megaCoro = StartCoroutine(MegaJumpRoutine(duration));
     }
 
-    private IEnumerator DoubleJumpRoutine(float duration)
+    private IEnumerator MegaJumpRoutine(float duration)
     {
-        doubleJumpActive = true;
+        megaJumpActive = true;
         yield return new WaitForSeconds(duration);
-        doubleJumpActive = false;
-        doubleJumpCoro = null;
+        megaJumpActive = false;
+        megaCoro = null;
+    }
+
+    // Reduce el gasto de estamina durante un tiempo. Factor entre 0.05 y 1.0 (1.0 = gasto normal)
+    public void ApplyStaminaDrainModifier(float duration, float factor)
+    {
+        factor = Mathf.Clamp(factor, 0.05f, 1f);
+        if (staminaCoro != null) StopCoroutine(staminaCoro);
+        staminaCoro = StartCoroutine(StaminaDrainRoutine(duration, factor));
+    }
+
+    private IEnumerator StaminaDrainRoutine(float duration, float factor)
+    {
+        staminaDrainMultiplier = factor;
+        yield return new WaitForSeconds(duration);
+        staminaDrainMultiplier = 1f;
+        staminaCoro = null;
     }
 }

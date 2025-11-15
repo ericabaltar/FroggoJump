@@ -2003,13 +2003,25 @@ MonoBehaviour:
   movingRowChance: 0.45
   movingBaseSpeedMin: 2
   movingBaseSpeedMax: 3.5
-  speedPowerupPrefab: {fileID: -7050036340770653258, guid: adcc8e3ae0dc96243b52aba47754b36e, type: 3}
-  speedDropChance: 0.023
-  doubleJumpPowerupPrefab: {fileID: -7050036340770653258, guid: bf673acda1f787e4cad7f8b006916971, type: 3}
-  doubleJumpDropChance: 0.063
-  doubleScorePowerupPrefab: {fileID: -7050036340770653258, guid: 7d0a7f871a8e87348bd519cae7bd2265, type: 3}
-  doubleScoreDropChance: 0.047
+  megaJumpPrefab: {fileID: 0}
+  megaJumpDropChance: 0.12
+  slowSpeedPrefab: {fileID: 0}
+  slowSpeedDropChance: 0.1
+  fastSpeedPrefab: {fileID: 0}
+  fastSpeedDropChance: 0.16
+  slowStaminaPrefab: {fileID: 0}
+  slowStaminaDropChance: 0.12
+  extraLifePrefab: {fileID: 0}
+  extraLifeDropChance: 0.06
   powerupLocalOffset: {x: 0, y: 0.35, z: 0}
+  flyPrefab: {fileID: 4828080618433411392, guid: bdd55aaf6712cfb4f850d2e12da866f5, type: 3}
+  fliesPerRowMin: 2
+  fliesPerRowMax: 4
+  flySpawnChance: 1
+  flyYOffset: 0.8
+  flyOnBaseChance: 1
+  flyOnBaseLocalOffset: {x: 0, y: 0.45, z: 0}
+  startingExtraLives: 0
 --- !u!4 &976540220
 Transform:
   m_ObjectHideFlags: 0
