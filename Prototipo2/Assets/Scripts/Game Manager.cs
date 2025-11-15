@@ -53,6 +53,17 @@ public class GameManager : MonoBehaviour
     [Tooltip("Offset local para colocar el powerup sobre la base")]
     [SerializeField] private Vector3 powerupLocalOffset = new Vector3(0f, 0.35f, 0f);
 
+    // ---------- FLIES (stamina pickups) ----------
+    [Header("Flies (stamina pickups) - Opción A (GameObject)")]
+    [SerializeField] private GameObject flyPrefab;  // GameObject para que puedas arrastrar cualquier prefab
+    [Tooltip("Número mínimo/máximo de moscas a intentar por fila.")]
+    [SerializeField] private int fliesPerRowMin = 0;
+    [SerializeField] private int fliesPerRowMax = 2;
+    [Tooltip("Probabilidad de spawnear cada intentona de mosca en la fila.")]
+    [Range(0f, 1f)][SerializeField] private float flySpawnChance = 0.6f;
+    [Tooltip("Altura visual por encima del terreno para las moscas.")]
+    [SerializeField] private float flyYOffset = 0.45f;
+
     // obstacles: (isRoad, yHeight, blockedX)
     private List<(bool isRoad, float terrainHeight, HashSet<int> locations)> obstacles = new();
     // posiciones X con BASE ESTÁTICA (las móviles NO se guardan aquí)
@@ -64,7 +75,6 @@ public class GameManager : MonoBehaviour
 
     // Camino serpenteante garantizado
     private int currentPathX;
-    private bool pathInitialized = false;
 
     // -------- SCORE MULTIPLIER --------
     private float scoreMultiplier = 1f;
@@ -89,7 +99,6 @@ public class GameManager : MonoBehaviour
         currentFarthestDistance = 0;
 
         currentPathX = Mathf.Clamp(0, minX, maxX);
-        pathInitialized = true;
 
         for (int i = 0; i < spawnDistance; i++) SpawnObstacle();
     }
@@ -109,10 +118,10 @@ public class GameManager : MonoBehaviour
         {
             // ROAD
             var road = Instantiate(roadPrefab, terrainHolder);
-            obstaclePositions = road.Init(spawnLocation);
+            obstaclePositions = road.Init(spawnLocation); // típicamente {-6, 6}
             terrainHeight = 0.2f;
 
-            // Asegurar columna del camino
+            // Asegurar que la columna del camino está libre
             currentPathX = FindNearestFreeX(desiredPathX, obstaclePositions);
 
             obstacles.Add((true, terrainHeight, obstaclePositions));
@@ -130,18 +139,24 @@ public class GameManager : MonoBehaviour
                 var staticXs = SpawnStaticRow(spawnLocation, terrainHeight, obstaclePositions, currentPathX);
                 baseLocations.Add(staticXs);
             }
+
+            // Moscas en road
+            SpawnFliesInRow(spawnLocation, terrainHeight, obstaclePositions);
         }
         else
         {
             // GRASS
             var grass = Instantiate(grassPrefab, terrainHolder);
-            obstaclePositions = grass.Init(spawnLocation, desiredPathX); // evita árboles en el camino
+            obstaclePositions = grass.Init(spawnLocation, desiredPathX); // evita obstáculos en el camino
             terrainHeight = 0.2f;
 
             currentPathX = desiredPathX;
 
             obstacles.Add((false, terrainHeight, obstaclePositions));
             baseLocations.Add(new HashSet<int>()); // sin bases en grass
+
+            // Moscas en grass
+            SpawnFliesInRow(spawnLocation, terrainHeight, obstaclePositions);
         }
 
         spawnLocation++;
@@ -233,8 +248,6 @@ public class GameManager : MonoBehaviour
     {
         if (baseTransform == null) return;
 
-        // Construimos una lista de candidatos activos (prefab + chance)
-        // Para evitar sesgo por orden, aleatorizamos el orden cada vez.
         var candidates = new List<(PowerUp prefab, float chance)>(3);
         if (speedPowerupPrefab != null && speedDropChance > 0f) candidates.Add((speedPowerupPrefab, speedDropChance));
         if (doubleJumpPowerupPrefab != null && doubleJumpDropChance > 0f) candidates.Add((doubleJumpPowerupPrefab, doubleJumpDropChance));
@@ -249,20 +262,83 @@ public class GameManager : MonoBehaviour
             (candidates[i], candidates[j]) = (candidates[j], candidates[i]);
         }
 
-        // Probamos en orden aleatorio y spawneamos el primero que “gane” su tirada
         foreach (var c in candidates)
         {
             if (Random.value <= c.chance)
             {
                 var pu = Instantiate(c.prefab, baseTransform);
                 pu.transform.localPosition = powerupLocalOffset; // encima del nenúfar
-                // Seguridad: es trigger
                 if (pu.TryGetComponent<Collider>(out var col) && !col.isTrigger) col.isTrigger = true;
                 break; // 1 por base
             }
         }
     }
 
+    // ---------- FLIES: spawner por fila (GameObject) ----------
+    private void SpawnFliesInRow(int z, float yHeight, HashSet<int> blockedPositions)
+    {
+        if (flyPrefab == null)
+        {
+            Debug.LogWarning("[GameManager] flyPrefab no asignado: no se spawnean moscas.");
+            return;
+        }
+
+        int tries = Random.Range(fliesPerRowMin, fliesPerRowMax + 1);
+
+        for (int i = 0; i < tries; i++)
+        {
+            if (Random.value > flySpawnChance) continue;
+
+            int x = Random.Range(minX, maxX + 1);
+            // Si quieres evitar obstáculo exacto, descomenta:
+            // if (blockedPositions.Contains(x)) continue;
+
+            var go = Instantiate(flyPrefab, terrainHolder);
+            // Asegura que la instancia queda ACTIVA
+            go.SetActive(true);
+
+            // Posición en mundo (altura un poco por encima del terreno)
+            go.transform.position = new Vector3(x, yHeight + flyYOffset, z);
+
+            // Garantiza el componente Fly
+            var fly = go.GetComponent<Fly>();
+            if (fly == null) fly = go.AddComponent<Fly>();
+
+            // Garantiza un Collider trigger (SphereCollider por defecto)
+            var col = go.GetComponent<Collider>();
+            if (col == null) col = go.AddComponent<SphereCollider>();
+            col.isTrigger = true;
+
+            if (col is SphereCollider sc)
+            {
+                // Si el radio es ínfimo, usa el pickupRadius del script
+                if (sc.radius < 0.05f) sc.radius = Mathf.Max(0.3f, fly.pickupRadius);
+                sc.center = Vector3.zero;
+            }
+
+            // Si no hay ningún renderer visible, crea un marcador visual de emergencia
+            bool hasRenderer = go.GetComponentInChildren<Renderer>() != null;
+            if (!hasRenderer)
+            {
+                var marker = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                marker.transform.SetParent(go.transform, worldPositionStays: false);
+                marker.transform.localPosition = Vector3.zero;
+                marker.transform.localScale = Vector3.one * 0.35f;
+
+                // Evita colisiones sólidas del marcador
+                var mc = marker.GetComponent<Collider>();
+                if (mc) Destroy(mc);
+            }
+
+            // Tag de seguridad
+            if (go.tag == "Untagged") go.tag = "Fly";
+
+            Debug.Log($"[GameManager] Fly @ (x={x}, z={z}) y={yHeight + flyYOffset}");
+        }
+    }
+
+
+    // ---------- SCORE / HUD ----------
     public void UpdateFarthestDistance(int distance)
     {
         if (distance > currentFarthestDistance)
@@ -276,6 +352,7 @@ public class GameManager : MonoBehaviour
         HudManager.Instance?.SetScore(shownScore);
     }
 
+    // ---------- QUERIES ----------
     public bool CheckIfAccessible(Vector2Int pos)
     {
         if (pos.y < 0 || pos.y >= obstacles.Count) return false;

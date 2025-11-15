@@ -19,11 +19,7 @@ public class PlayerController : MonoBehaviour
     private InputType bufferedInputType;
     private float bufferTimeLeft = 0f;
 
-    struct InputInfo
-    {
-        public float timeHeld;
-        public Vector2Int direction;
-    }
+    struct InputInfo { public float timeHeld; public Vector2Int direction; }
     private Dictionary<Key, InputInfo> inputHeldTimes = new Dictionary<Key, InputInfo>();
 
     private enum PlayerState { Ready, Moving, Dead }
@@ -38,44 +34,55 @@ public class PlayerController : MonoBehaviour
     private bool isOnMovingBase = false;
     private MovingBase currentMovingBase = null;
 
-    // Guardamos el padre previo para restaurarlo si hace falta
     private Transform defaultParent;
 
-    // --- POWERUPS ---
-    private bool doubleJumpActive = false;
+    // --------- POWERUPS ---------
+    // Velocidad
     private Coroutine speedCoro;
-    private float speedOriginalMoveDuration;
+    private float originalBaseMoveDuration;
+
+    // Doble salto (TAP = 2 casillas mientras dure)
+    private bool doubleJumpActive = false;
+    private Coroutine doubleJumpCoro;
 
     void Start()
     {
-        // Posición inicial en la grid
         pos = new Vector2Int(0, 0);
         transform.position = new Vector3(0, 0.2f, 0);
 
         currentMoveDuration = baseMoveDuration;
+        originalBaseMoveDuration = baseMoveDuration;
+
         currentStamina = maxStamina;
 
-        speedOriginalMoveDuration = baseMoveDuration;
-
         defaultParent = transform.parent;
+
+        HudManager.Instance?.SetStaminaBar((float)currentStamina / maxStamina);
     }
 
     void Update()
     {
         HandleInput();
 
-        // Si el jugador quiere moverse
+        // Si no hay stamina, no aceptamos saltos
+        if (currentStamina <= 0)
+        {
+            bufferedInputDirection = Vector2Int.zero;
+        }
+
+        // Intento de movimiento
         if (state == PlayerState.Ready && bufferedInputDirection != Vector2Int.zero)
         {
+            if (currentStamina <= 0) return;
+
             Vector2Int moveDirection = bufferedInputDirection;
             TurnCharacter(moveDirection);
 
-            // TAP = 1 casilla (o 2 si doubleJump activo); HOLD = 2 casillas
-            Vector2Int destination;
-            if (bufferedInputType == InputType.Tap)
-                destination = pos + (doubleJumpActive ? moveDirection * 2 : moveDirection);
-            else
-                destination = pos + moveDirection * 2;
+            // TAP = 1 casilla (o 2 si doubleJumpActive); HOLD = 2 casillas
+            Vector2Int destination =
+                (bufferedInputType == InputType.Tap)
+                ? pos + (doubleJumpActive ? moveDirection * 2 : moveDirection)
+                : pos + moveDirection * 2;
 
             if (GameManager.Instance.CheckIfAccessible(destination))
             {
@@ -85,7 +92,7 @@ public class PlayerController : MonoBehaviour
 
         if (isOnMovingBase)
         {
-            // Actualiza pos.x con la plataforma (por si se redondea entre frames)
+            // Seguir X de la plataforma para mantener coherencia con la grid
             pos.x = Mathf.RoundToInt(transform.position.x);
         }
     }
@@ -94,93 +101,77 @@ public class PlayerController : MonoBehaviour
     {
         state = PlayerState.Moving;
 
-        // Si estamos subidos a una base móvil, soltamos antes de saltar
+        // Suelta plataforma antes de saltar
         if (currentMovingBase != null)
         {
-            transform.SetParent(defaultParent, true); // mantener world pos
+            transform.SetParent(defaultParent, true);
         }
 
         float elapsedTime = 0f;
 
-        // Altura según el tipo de terreno de la fila destino
         float yHeight = 0.2f;
         if (destination.y >= 0)
-        {
             yHeight = GameManager.Instance.GetTerrainHeight(destination.y);
-        }
 
         Vector3 startPos = transform.position;
         Vector3 endPos = new Vector3(destination.x, yHeight, destination.y);
 
-        // Conserva yaw, sin inclinaciones raras
         float startYaw = transform.localEulerAngles.y;
 
         while (elapsedTime < currentMoveDuration)
         {
             float percent = elapsedTime / currentMoveDuration;
 
-            // Interpolación + arco de salto
             Vector3 newPos = Vector3.Lerp(startPos, endPos, percent);
             newPos.y = yHeight + (0.5f * Mathf.Sin(Mathf.PI * percent));
             transform.position = newPos;
 
-            // Mantener solo yaw (sin pitch/roll)
+            // Mantén solo yaw (sin pitch/roll)
             transform.localRotation = Quaternion.Euler(0f, startYaw, 0f);
 
             elapsedTime += Time.deltaTime;
             yield return null;
         }
 
-        // Aseguramos posición final
         transform.position = endPos;
         transform.localRotation = Quaternion.Euler(0f, startYaw, 0f);
 
-        // Actualizamos coordenadas grid
+        // Consumir stamina por salto
+        DecreaseStamina(1);
+
+        // Actualiza grid
         pos = destination;
         GameManager.Instance.UpdateFarthestDistance(destination.y);
 
-        // --- LÓGICA DE MUERTE: solo Road sin base estática y sin base móvil ---
+        // Muerte solo Road sin base estática ni móvil
         bool isRoadRow = GameManager.Instance.IsRoadRow(destination.y);
-
         if (isRoadRow && !GameManager.Instance.HasBaseAt(pos) && !isOnMovingBase)
         {
             Die();
             yield break;
         }
 
-        DecreaseStamina();
-
         if (state == PlayerState.Moving)
         {
             state = PlayerState.Ready;
 
-            // Si hemos aterrizado encima de una base móvil (trigger activo),
-            // nos volvemos a subir (parentar) para movernos juntos.
             if (isOnMovingBase && currentMovingBase != null)
-            {
                 GetOnMovingPlatform(currentMovingBase);
-            }
             else
-            {
                 transform.SetParent(defaultParent, true);
-            }
         }
     }
 
     private void HandleInput()
     {
-        // Detect arrow key presses.
         DetectDirectionalInput(Keyboard.current.upArrowKey, Vector2Int.up);
         DetectDirectionalInput(Keyboard.current.downArrowKey, Vector2Int.down);
         DetectDirectionalInput(Keyboard.current.leftArrowKey, Vector2Int.left);
         DetectDirectionalInput(Keyboard.current.rightArrowKey, Vector2Int.right);
 
-        // Reduce buffer time left
         if (bufferTimeLeft > 0f)
         {
             bufferTimeLeft -= Time.deltaTime;
-
-            // Remove the saved input if enough time has passed
             if (bufferTimeLeft <= 0f)
                 bufferedInputDirection = Vector2Int.zero;
         }
@@ -199,8 +190,7 @@ public class PlayerController : MonoBehaviour
 
         if (key.wasPressedThisFrame)
         {
-            InputInfo info = new InputInfo { timeHeld = 0f, direction = direction };
-            inputHeldTimes[key.keyCode] = info;
+            inputHeldTimes[key.keyCode] = new InputInfo { timeHeld = 0f, direction = direction };
 
             if (state == PlayerState.Ready)
             {
@@ -212,10 +202,8 @@ public class PlayerController : MonoBehaviour
             }
         }
 
-        // If the key is being held (exists in the dictionary)
         if (inputHeldTimes.TryGetValue(key.keyCode, out InputInfo inputInfo))
         {
-            // Update time held
             inputInfo.timeHeld += Time.deltaTime;
             inputHeldTimes[key.keyCode] = inputInfo;
 
@@ -229,19 +217,14 @@ public class PlayerController : MonoBehaviour
                 totalMovementDirection += info.direction;
             }
 
-            // When the key is released, remove it from the dictionary and add the input to the buffer
             if (key.wasReleasedThisFrame)
             {
                 inputHeldTimes.Clear();
 
                 if (duration < holdTime)
-                {
                     AddInputToBuffer(totalMovementDirection, InputType.Tap);
-                }
                 else
-                {
                     AddInputToBuffer(totalMovementDirection, InputType.Hold);
-                }
             }
         }
     }
@@ -251,37 +234,36 @@ public class PlayerController : MonoBehaviour
         if (state == PlayerState.Dead) return;
 
         state = PlayerState.Dead;
-        transform.SetParent(defaultParent, true); // por si estábamos parentados
+        transform.SetParent(defaultParent, true);
         Debug.Log("Has pisado carretera sin base. GAME OVER.");
     }
 
     void TurnCharacter(Vector2Int moveDirection)
     {
-        // Rotación hacia la dirección real (incluye diagonales)
         float yaw = Mathf.Atan2(moveDirection.x, moveDirection.y) * Mathf.Rad2Deg;
         transform.localRotation = Quaternion.Euler(0f, yaw, 0f);
     }
 
-    void IncreaseStamina()
+    // ------- STAMINA -------
+    private void SetStamina(int value)
     {
-        currentStamina = maxStamina;
-        currentMoveDuration = baseMoveDuration;
-        HudManager.Instance.SetStaminaBar((float)currentStamina / maxStamina);
+        currentStamina = Mathf.Clamp(value, 0, maxStamina);
+        HudManager.Instance?.SetStaminaBar((float)currentStamina / maxStamina);
     }
 
-    void DecreaseStamina()
+    private void DecreaseStamina(int amount)
     {
-        if (currentStamina > 0)
+        SetStamina(currentStamina - Mathf.Abs(amount));
+        if (currentStamina <= 0)
         {
-            currentStamina -= 1;
-
-            if (currentStamina == 0)
-            {
-                currentMoveDuration = baseMoveDuration * 5f;
-            }
+            // feedback opcional al quedarte sin stamina
         }
+    }
 
-        HudManager.Instance.SetStaminaBar((float)currentStamina / maxStamina);
+    private void AddStamina(int amount)
+    {
+        if (amount <= 0) return;
+        SetStamina(currentStamina + amount);
     }
 
     void GetOnMovingPlatform(MovingBase movingBase)
@@ -289,11 +271,7 @@ public class PlayerController : MonoBehaviour
         isOnMovingBase = true;
         currentMovingBase = movingBase;
         transform.SetParent(currentMovingBase.transform, true);
-        transform.position = new Vector3(
-            currentMovingBase.transform.position.x,
-            currentMovingBase.transform.position.y,
-            currentMovingBase.transform.position.z
-        );
+        transform.position = currentMovingBase.transform.position;
     }
 
     // --- Triggers: Fly y MovingBase ---
@@ -301,7 +279,9 @@ public class PlayerController : MonoBehaviour
     {
         if (other.CompareTag("Fly"))
         {
-            IncreaseStamina();
+            var fly = other.GetComponent<Fly>();
+            int amount = (fly != null) ? fly.staminaAmount : 1;
+            AddStamina(amount);
             Destroy(other.gameObject);
         }
         else if (!isOnMovingBase && other.CompareTag("MovingBase"))
@@ -309,11 +289,8 @@ public class PlayerController : MonoBehaviour
             isOnMovingBase = true;
             currentMovingBase = other.GetComponent<MovingBase>();
 
-            // Solo nos subimos si no estamos en mitad de un salto
             if (state == PlayerState.Ready && currentMovingBase != null)
-            {
                 GetOnMovingPlatform(currentMovingBase);
-            }
         }
     }
 
@@ -321,7 +298,6 @@ public class PlayerController : MonoBehaviour
     {
         if (other.CompareTag("MovingBase"))
         {
-            // Si sales de la base móvil, deja de ser su hijo
             if (other.GetComponent<MovingBase>() == currentMovingBase)
             {
                 isOnMovingBase = false;
@@ -335,28 +311,27 @@ public class PlayerController : MonoBehaviour
 
     /// <summary>
     /// Aumenta la velocidad reduciendo temporalmente el moveDuration.
+    /// speedMultiplier > 1 ⇒ más rápido.
     /// </summary>
-    /// <param name="duration">Duración del efecto (segundos)</param>
-    /// <param name="speedMultiplier">>1 para ir más rápido (p.ej. 1.5)</param>
     public void ApplySpeedPowerup(float duration, float speedMultiplier)
     {
-        // velocidad ↑ ⇒ moveDuration ↓
-        float newDuration = Mathf.Max(0.01f, baseMoveDuration / Mathf.Max(0.01f, speedMultiplier));
+        if (speedMultiplier <= 0f) speedMultiplier = 1f;
+
+        // Reducimos la duración por salto (más velocidad)
+        float boosted = Mathf.Max(0.01f, originalBaseMoveDuration / speedMultiplier);
 
         if (speedCoro != null) StopCoroutine(speedCoro);
-        speedCoro = StartCoroutine(SpeedPowerRoutine(duration, newDuration));
+        speedCoro = StartCoroutine(SpeedPowerRoutine(duration, boosted));
     }
 
     private IEnumerator SpeedPowerRoutine(float duration, float boostedMoveDuration)
     {
-        float prevBase = baseMoveDuration;
-
         baseMoveDuration = boostedMoveDuration;
-        currentMoveDuration = baseMoveDuration; // aplica ya si estamos en Ready
+        currentMoveDuration = baseMoveDuration;
 
         yield return new WaitForSeconds(duration);
 
-        baseMoveDuration = speedOriginalMoveDuration;
+        baseMoveDuration = originalBaseMoveDuration;
         currentMoveDuration = baseMoveDuration;
         speedCoro = null;
     }
@@ -366,8 +341,8 @@ public class PlayerController : MonoBehaviour
     /// </summary>
     public void ApplyDoubleJumpPowerup(float duration)
     {
-        StopCoroutine(nameof(DoubleJumpRoutine));
-        StartCoroutine(DoubleJumpRoutine(duration));
+        if (doubleJumpCoro != null) StopCoroutine(doubleJumpCoro);
+        doubleJumpCoro = StartCoroutine(DoubleJumpRoutine(duration));
     }
 
     private IEnumerator DoubleJumpRoutine(float duration)
@@ -375,5 +350,6 @@ public class PlayerController : MonoBehaviour
         doubleJumpActive = true;
         yield return new WaitForSeconds(duration);
         doubleJumpActive = false;
+        doubleJumpCoro = null;
     }
 }
