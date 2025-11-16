@@ -1087,6 +1087,66 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 3859348135394012647, guid: 5479be6b53bcbef4c8efe89a3c97597c, type: 3}
+      propertyPath: randomTiltXZ
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 3859348135394012647, guid: 5479be6b53bcbef4c8efe89a3c97597c, type: 3}
+      propertyPath: tiltXRange.x
+      value: -2.82
+      objectReference: {fileID: 0}
+    - target: {fileID: 3859348135394012647, guid: 5479be6b53bcbef4c8efe89a3c97597c, type: 3}
+      propertyPath: tiltXRange.y
+      value: 18.47
+      objectReference: {fileID: 0}
+    - target: {fileID: 3859348135394012647, guid: 5479be6b53bcbef4c8efe89a3c97597c, type: 3}
+      propertyPath: tiltZRange.y
+      value: 45
+      objectReference: {fileID: 0}
+    - target: {fileID: 3859348135394012647, guid: 5479be6b53bcbef4c8efe89a3c97597c, type: 3}
+      propertyPath: scaleXRange.x
+      value: 1.24
+      objectReference: {fileID: 0}
+    - target: {fileID: 3859348135394012647, guid: 5479be6b53bcbef4c8efe89a3c97597c, type: 3}
+      propertyPath: scaleXRange.y
+      value: 1.3
+      objectReference: {fileID: 0}
+    - target: {fileID: 3859348135394012647, guid: 5479be6b53bcbef4c8efe89a3c97597c, type: 3}
+      propertyPath: scaleYRange.x
+      value: 2.17
+      objectReference: {fileID: 0}
+    - target: {fileID: 3859348135394012647, guid: 5479be6b53bcbef4c8efe89a3c97597c, type: 3}
+      propertyPath: scaleYRange.y
+      value: 2.17
+      objectReference: {fileID: 0}
+    - target: {fileID: 3859348135394012647, guid: 5479be6b53bcbef4c8efe89a3c97597c, type: 3}
+      propertyPath: scaleZRange.x
+      value: 2.81
+      objectReference: {fileID: 0}
+    - target: {fileID: 3859348135394012647, guid: 5479be6b53bcbef4c8efe89a3c97597c, type: 3}
+      propertyPath: scaleZRange.y
+      value: 2.81
+      objectReference: {fileID: 0}
+    - target: {fileID: 3859348135394012647, guid: 5479be6b53bcbef4c8efe89a3c97597c, type: 3}
+      propertyPath: rotationYRange.x
+      value: 6.19
+      objectReference: {fileID: 0}
+    - target: {fileID: 3859348135394012647, guid: 5479be6b53bcbef4c8efe89a3c97597c, type: 3}
+      propertyPath: randomUniformScale
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3859348135394012647, guid: 5479be6b53bcbef4c8efe89a3c97597c, type: 3}
+      propertyPath: uniformScaleRange.x
+      value: 2.62
+      objectReference: {fileID: 0}
+    - target: {fileID: 3859348135394012647, guid: 5479be6b53bcbef4c8efe89a3c97597c, type: 3}
+      propertyPath: uniformScaleRange.y
+      value: 4.76
+      objectReference: {fileID: 0}
+    - target: {fileID: 3859348135394012647, guid: 5479be6b53bcbef4c8efe89a3c97597c, type: 3}
+      propertyPath: applyRandomToAllObstacles
+      value: 1
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -2003,24 +2063,24 @@ MonoBehaviour:
   movingRowChance: 0.45
   movingBaseSpeedMin: 2
   movingBaseSpeedMax: 3.5
-  megaJumpPrefab: {fileID: 0}
-  megaJumpDropChance: 0.12
-  slowSpeedPrefab: {fileID: 0}
-  slowSpeedDropChance: 0.1
-  fastSpeedPrefab: {fileID: 0}
-  fastSpeedDropChance: 0.16
-  slowStaminaPrefab: {fileID: 0}
-  slowStaminaDropChance: 0.12
-  extraLifePrefab: {fileID: 0}
-  extraLifeDropChance: 0.06
-  powerupLocalOffset: {x: 0, y: 0.35, z: 0}
+  slowSpeedPrefab: {fileID: 1055044749162622376, guid: 45b9b720ac43ea845b394817145e154e, type: 3}
+  slowSpeedDropChance: 0.021
+  fastSpeedPrefab: {fileID: -2833540046196023011, guid: 3f2e274dd5a40b349bd8fd40779120ac, type: 3}
+  fastSpeedDropChance: 0.028
+  slowStaminaPrefab: {fileID: 8482975538183197909, guid: 48c43fd6229430d4cad506ec85554554, type: 3}
+  slowStaminaDropChance: 0.048
+  extraLifePrefab: {fileID: 4891572699635380787, guid: d3057ac2e088b1e4f8d339531c97d43f, type: 3}
+  extraLifeDropChance: 0.048
+  powerupSocketName: PowerupSocket
+  powerupExtraOffsetY: 0
+  powerupLocalOffset: {x: 0, y: 0.75, z: 0}
   flyPrefab: {fileID: 4828080618433411392, guid: bdd55aaf6712cfb4f850d2e12da866f5, type: 3}
   fliesPerRowMin: 2
   fliesPerRowMax: 4
   flySpawnChance: 1
   flyYOffset: 0.8
   flyOnBaseChance: 1
-  flyOnBaseLocalOffset: {x: 0, y: 0.45, z: 0}
+  flyOnBaseLocalOffset: {x: 4.64, y: 0.45, z: 1.29}
   startingExtraLives: 0
 --- !u!4 &976540220
 Transform:
