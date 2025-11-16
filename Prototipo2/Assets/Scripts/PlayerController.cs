@@ -219,7 +219,7 @@ public class PlayerController : MonoBehaviour
 
     private void Die()
     {
-        // Vida extra: si hay, evita la muerte
+        // Si tienes una vida extra, cancela la muerte
         if (GameManager.Instance != null && GameManager.Instance.TryConsumeExtraLife())
         {
             state = PlayerState.Ready;
@@ -229,9 +229,43 @@ public class PlayerController : MonoBehaviour
 
         if (state == PlayerState.Dead) return;
         state = PlayerState.Dead;
+
+        // Asegura que no sigues “enganchado” a plataformas
+        isOnMovingBase = false;
+        currentMovingBase = null;
         transform.SetParent(defaultParent, true);
-        Debug.Log("Has muerto.");
+
+        // Anula cualquier input pendiente y corutinas de movimiento
+        bufferedInputDirection = Vector2Int.zero;
+        StopAllCoroutines();
+
+        // (Opcional) desactivar colisiones mientras dura la transición
+        var col = GetComponent<Collider>();
+        if (col) col.enabled = false;
+
+        // Lanza la transición de foco (si no está en escena, fallback a log)
+        var spotlight = DeathSpotlightController.Instance;
+        if (spotlight != null)
+        {
+            spotlight.Play(this.transform, OnDeathFocusComplete);
+        }
+        else
+        {
+            Debug.Log("Has muerto. (DeathSpotlightController no encontrado)");
+            OnDeathFocusComplete();
+        }
     }
+
+    // Callback al terminar la animación del foco
+    private void OnDeathFocusComplete()
+    {
+        // Aquí decides qué hacer: game over, respawn, recargar escena, etc.
+        // Ejemplos:
+        // UnityEngine.SceneManagement.SceneManager.LoadScene("GameOver");
+        // o GameManager.Instance.ShowGameOver();
+        Debug.Log("Fin de transición de muerte.");
+    }
+
 
     void TurnCharacter(Vector2Int moveDirection)
     {
