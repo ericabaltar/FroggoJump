@@ -1,11 +1,15 @@
-Shader "UI/SpotlightCutout"
+Shader "UI/SpotlightCutoutBG"
 {
     Properties
     {
-        _Color   ("Tint", Color) = (0,0,0,1)   // color del fondo (negro con alpha)
-        _Center  ("Center (viewport 0..1)", Vector) = (0.5, 0.5, 0, 0)
-        _Radius  ("Radius", Float) = 0.35    // radio del agujero
-        _Feather ("Feather", Float) = 0.1      // borde suave del agujero
+        _Color   ("Overlay Color (fallback)", Color) = (0,0,0,1)
+        _Center  ("Center (viewport 0..1)", Vector)  = (0.5, 0.5, 0, 0)
+        _Radius  ("Radius", Float) = 0.25
+        _Feather ("Feather", Float) = 0.12
+
+        _BgTex   ("Background Texture", 2D) = "white" {}
+        _BgTint  ("Background Tint", Color) = (1,1,1,1)
+        _BgMix   ("Background Mix (0=Color,1=Texture)", Range(0,1)) = 1
     }
     SubShader
     {
@@ -25,16 +29,20 @@ Shader "UI/SpotlightCutout"
             float  _Radius;
             float  _Feather;
 
+            sampler2D _BgTex;
+            fixed4 _BgTint;
+            float  _BgMix;
+
             struct appdata
             {
                 float4 vertex : POSITION;
-                float2 uv     : TEXCOORD0;
+                float2 uv     : TEXCOORD0; // UVs de la Image (0..1 pantalla completa)
             };
 
             struct v2f
             {
                 float4 pos : SV_POSITION;
-                float2 uv  : TEXCOORD0; // usaremos uv como coords en 0..1 del rect
+                float2 uv  : TEXCOORD0;
             };
 
             v2f vert (appdata v)
@@ -45,28 +53,29 @@ Shader "UI/SpotlightCutout"
                 return o;
             }
 
-         fixed4 frag (v2f i) : SV_Target
-        {
-            // coord 0..1 del rect
-            float2 p = i.uv;
-            float2 c = _Center.xy;
+            fixed4 frag (v2f i) : SV_Target
+            {
+                // Posición 0..1 del rect y centro
+                float2 p = i.uv;
+                float2 c = _Center.xy;
 
-            // aspect = width / height
-            float aspect = _ScreenParams.x / _ScreenParams.y;
+                // Corrige óvalo -> círculo con aspect ratio
+                float aspect = _ScreenParams.x / _ScreenParams.y;
+                float2 d2 = float2( (p.x - c.x) * aspect, (p.y - c.y) );
+                float d = length(d2);
 
-            // CORRECCIÓN DE ASPECTO:
-            // escala la distancia en X por el aspect para que el círculo sea isotrópico
-            float2 d2 = float2( (p.x - c.x) * aspect, (p.y - c.y) );
-            float d = length(d2);
+                // Máscara: 0 dentro del círculo (agujero transparente), 1 fuera
+                float a = smoothstep(_Radius - _Feather, _Radius, d);
 
-            // borde suave
-            float a = smoothstep(_Radius - _Feather, _Radius, d);
+                // Color base fuera del círculo: mezcla entre Color sólido y textura
+                fixed4 bg = tex2D(_BgTex, i.uv) * _BgTint;
+                fixed4 baseCol = lerp(_Color, bg, _BgMix);
 
-            fixed4 col = _Color;
-            col.a *= saturate(a);
-            return col;
-        }
+                // Alpha sólo fuera del círculo
+                baseCol.a *= saturate(a);
 
+                return baseCol;
+            }
             ENDCG
         }
     }

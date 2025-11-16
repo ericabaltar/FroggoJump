@@ -9,14 +9,25 @@ public class DeathSpotlightController : MonoBehaviour
     [Header("Setup")]
     [SerializeField] private Camera cam;                // tu cámara principal
     [SerializeField] private Image overlayImage;        // UI Image pantalla completa
-    [SerializeField] private Material spotlightMaterial;// material con el shader SpotlightCutout
+    [SerializeField] private Material spotlightMaterial;// material (SpotlightCutout o SpotlightCutoutBG)
 
     [Header("Animación")]
-    [SerializeField] private float inDuration = 0.6f;   // tiempo de cerrar el foco
-    [SerializeField] private float startRadius = 1.2f;  // empieza sin oscurecer (agujero grandote)
-    [SerializeField] private float endRadius = 0.12f;   // final: foco pequeño sobre el player
-    [SerializeField] private float feather = 0.18f;     // borde suave
-    [SerializeField] private Color overlayColor = new Color(0f, 0f, 0f, 1f); // negro
+    [SerializeField] private float inDuration = 1.2f;   // <-- más lento que antes
+    [SerializeField] private float startRadius = 1.6f;
+    [SerializeField] private float endRadius = 0.25f;
+    [SerializeField] private float feather = 0.18f;
+    [SerializeField] private Color overlayColor = new Color(0f, 0f, 0f, 1f);
+
+    [Header("Pausa de juego durante la animación")]
+    [SerializeField] private bool pauseGameDuringTransition = true;
+    [SerializeField] private bool resumeTimeAfterTransition = false; // para “reverse”/respawn
+    private float _prevTimeScale = 1f;
+
+    // (Opcionales si usas el shader con fondo)
+    [Header("Fondo opcional")]
+    [SerializeField] private Texture2D transitionBackground;
+    [SerializeField, Range(0f, 1f)] private float bgMix = 1f;
+    [SerializeField] private Color bgTint = Color.white;
 
     Material _runtimeMat;
     Transform _target;         // jugador a seguir
@@ -27,19 +38,23 @@ public class DeathSpotlightController : MonoBehaviour
         if (Instance != null && Instance != this) { Destroy(gameObject); return; }
         Instance = this;
 
-        // Material en runtime (no pisamos el asset)
         _runtimeMat = new Material(spotlightMaterial);
         _runtimeMat.SetFloat("_Feather", feather);
         _runtimeMat.SetColor("_Color", overlayColor);
 
+        // Soporte para el shader con imagen de fondo (si lo usas)
+        if (transitionBackground != null)
+            _runtimeMat.SetTexture("_BgTex", transitionBackground);
+        _runtimeMat.SetColor("_BgTint", bgTint);
+        _runtimeMat.SetFloat("_BgMix", bgMix);
+
         overlayImage.material = _runtimeMat;
-        overlayImage.raycastTarget = false; // para no bloquear UI si no quieres
-        overlayImage.enabled = false;       // apagado por defecto
+        overlayImage.raycastTarget = false;
+        overlayImage.enabled = false;
     }
 
     /// <summary>
-    /// Lanza la transición: foco cerrándose alrededor de target.
-    /// onComplete se llama al terminar.
+    /// Lanza la transición (cierre de foco). Pausa el juego si está activado.
     /// </summary>
     public void Play(Transform target, System.Action onComplete = null)
     {
@@ -52,6 +67,13 @@ public class DeathSpotlightController : MonoBehaviour
         _target = target;
         overlayImage.enabled = true;
 
+        // Pausar juego si procede
+        if (pauseGameDuringTransition)
+        {
+            _prevTimeScale = Time.timeScale;
+            Time.timeScale = 0f;
+        }
+
         // Estado inicial
         _runtimeMat.SetFloat("_Radius", startRadius);
         _runtimeMat.SetFloat("_Feather", feather);
@@ -60,18 +82,17 @@ public class DeathSpotlightController : MonoBehaviour
         float t = 0f;
         while (t < inDuration)
         {
-            t += Time.unscaledDeltaTime; // que no dependa de Time.timeScale si pausarás
+            t += Time.unscaledDeltaTime;         // animación independiente del timeScale
             float k = Mathf.Clamp01(t / inDuration);
 
             // Interpolar radio
             float r = Mathf.Lerp(startRadius, endRadius, k);
             _runtimeMat.SetFloat("_Radius", r);
 
-            // Actualizar centro a la posición del jugador cada frame
+            // Centro al jugador cada frame
             if (cam != null && _target != null)
             {
                 Vector3 vp = cam.WorldToViewportPoint(_target.position);
-                // Clamp por si sale de pantalla
                 vp.x = Mathf.Clamp01(vp.x);
                 vp.y = Mathf.Clamp01(vp.y);
                 _runtimeMat.SetVector("_Center", new Vector4(vp.x, vp.y, 0f, 0f));
@@ -80,19 +101,20 @@ public class DeathSpotlightController : MonoBehaviour
             yield return null;
         }
 
-        // Radio final y centro definitivo
-        if (_target != null && cam != null)
-        {
-            Vector3 vp = cam.WorldToViewportPoint(_target.position);
-            _runtimeMat.SetVector("_Center", new Vector4(Mathf.Clamp01(vp.x), Mathf.Clamp01(vp.y), 0f, 0f));
-        }
+        // Valor final por seguridad
         _runtimeMat.SetFloat("_Radius", endRadius);
+
+        // Reanudar timeScale si quieres (para casos de reverse/respawn en la misma escena)
+        if (pauseGameDuringTransition && resumeTimeAfterTransition)
+        {
+            Time.timeScale = _prevTimeScale;
+        }
 
         onComplete?.Invoke();
     }
 
     /// <summary>
-    /// Si quieres revertir (abrir el círculo) para volver al juego o al fade-in de respawn.
+    /// Transición inversa (abrir el foco). Útil para respawn.
     /// </summary>
     public void PlayReverse(Transform target, System.Action onComplete = null)
     {
@@ -104,6 +126,12 @@ public class DeathSpotlightController : MonoBehaviour
     {
         _target = target;
         overlayImage.enabled = true;
+
+        if (pauseGameDuringTransition)
+        {
+            _prevTimeScale = Time.timeScale;
+            Time.timeScale = 0f;
+        }
 
         float t = 0f;
         while (t < inDuration)
@@ -126,6 +154,13 @@ public class DeathSpotlightController : MonoBehaviour
         }
 
         overlayImage.enabled = false;
+
+        // Al terminar el reverse, normalmente quieres reanudar el juego
+        if (pauseGameDuringTransition)
+        {
+            Time.timeScale = _prevTimeScale;
+        }
+
         onComplete?.Invoke();
     }
 }
