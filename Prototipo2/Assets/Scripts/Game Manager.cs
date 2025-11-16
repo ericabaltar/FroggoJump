@@ -36,29 +36,31 @@ public class GameManager : MonoBehaviour
     [SerializeField] private float movingBaseSpeedMin = 2f;
     [SerializeField] private float movingBaseSpeedMax = 3.5f;
 
-    // ---------- POWERUPS (prefab por tipo NUEVOS) ----------
-    [Header("PowerUps (nuevos)")]
-    [SerializeField] private PowerUp megaJumpPrefab;
-    [Range(0f, 1f)][SerializeField] private float megaJumpDropChance = 0.12f;
-
-    [SerializeField] private PowerUp slowSpeedPrefab;
+    // ---------- POWERUPS ----------
+    [Header("PowerUps")]
+    [SerializeField] private PowerUp slowSpeedPrefab;        // Reducir velocidad
     [Range(0f, 1f)][SerializeField] private float slowSpeedDropChance = 0.10f;
 
-    [SerializeField] private PowerUp fastSpeedPrefab;
+    [SerializeField] private PowerUp fastSpeedPrefab;        // Aumentar velocidad
     [Range(0f, 1f)][SerializeField] private float fastSpeedDropChance = 0.16f;
 
-    [SerializeField] private PowerUp slowStaminaPrefab;
+    [SerializeField] private PowerUp slowStaminaPrefab;      // Estamina se gasta más lento
     [Range(0f, 1f)][SerializeField] private float slowStaminaDropChance = 0.12f;
 
-    [SerializeField] private PowerUp extraLifePrefab;
+    [SerializeField] private PowerUp extraLifePrefab;        // Vida extra
     [Range(0f, 1f)][SerializeField] private float extraLifeDropChance = 0.06f;
 
-    [Tooltip("Offset local para colocar el powerup encima de la base")]
-    [SerializeField] private Vector3 powerupLocalOffset = new Vector3(0f, 0.35f, 0f);
+    [Header("Placement de PowerUps (Sockets)")]
+    [Tooltip("Nombre del hijo vacío en la base donde se ancla el powerup.")]
+    [SerializeField] private string powerupSocketName = "PowerupSocket";
+    [Tooltip("Ajuste fino vertical extra sobre el socket.")]
+    [SerializeField] private float powerupExtraOffsetY = 0.0f;
+    [Tooltip("Si no hay socket, usamos este offset local respecto a la base.")]
+    [SerializeField] private Vector3 powerupLocalOffset = new Vector3(0f, 0.75f, 0f);
 
     // ---------- FLIES (stamina pickups) ----------
     [Header("Flies (stamina pickups) - suelo")]
-    [SerializeField] private GameObject flyPrefab;     // GameObject a prueba de balas
+    [SerializeField] private GameObject flyPrefab;     // Prefab de mosca (GameObject)
     [SerializeField] private int fliesPerRowMin = 0;
     [SerializeField] private int fliesPerRowMax = 2;
     [Range(0f, 1f)][SerializeField] private float flySpawnChance = 0.6f;
@@ -75,15 +77,17 @@ public class GameManager : MonoBehaviour
 
     // obstacles: (isRoad, yHeight, blockedX)
     private readonly List<(bool isRoad, float terrainHeight, HashSet<int> locations)> obstacles = new();
+    // posiciones X con BASE ESTÁTICA (las móviles NO se guardan aquí)
     private readonly List<HashSet<int>> baseLocations = new();
 
     private int spawnLocation;
     private int currentFarthestDistance = 0;
     public static GameManager Instance { get; private set; }
 
+    // Camino serpenteante garantizado
     private int currentPathX;
 
-    // -------- SCORE MULTIPLIER (si lo usas para otra cosa) --------
+    // (Opcional) multiplicador de score si lo usas
     private float scoreMultiplier = 1f;
     private Coroutine scoreMultiplierCoro;
 
@@ -131,6 +135,7 @@ public class GameManager : MonoBehaviour
 
             obstacles.Add((true, terrainHeight, obstaclePositions));
 
+            // solo estáticas O solo 1 móvil
             bool rowIsMoving = Random.value < movingRowChance;
 
             if (rowIsMoving)
@@ -144,13 +149,14 @@ public class GameManager : MonoBehaviour
                 baseLocations.Add(staticXs);
             }
 
+            // moscas en suelo de ROAD
             SpawnFliesInRow(spawnLocation, terrainHeight, obstaclePositions);
         }
         else
         {
             // GRASS
             var grass = Instantiate(grassPrefab, terrainHolder);
-            obstaclePositions = grass.Init(spawnLocation, desiredPathX);
+            obstaclePositions = grass.Init(spawnLocation, desiredPathX); // evita obst en el camino
             terrainHeight = 0.2f;
 
             currentPathX = desiredPathX;
@@ -158,6 +164,7 @@ public class GameManager : MonoBehaviour
             obstacles.Add((false, terrainHeight, obstaclePositions));
             baseLocations.Add(new HashSet<int>());
 
+            // moscas en suelo de GRASS
             SpawnFliesInRow(spawnLocation, terrainHeight, obstaclePositions);
         }
 
@@ -198,7 +205,7 @@ public class GameManager : MonoBehaviour
         TrySpawnPowerup(b);
         TrySpawnFlyOnBase(b);
 
-        // 2) Extras
+        // 2) Estáticas extra
         int targetTotal = Random.Range(minBasesPerRow, maxBasesPerRow + 1);
         int attempts = 0;
 
@@ -220,7 +227,7 @@ public class GameManager : MonoBehaviour
         return staticXs;
     }
 
-    // ---------- Fila móvil (exactamente 1) ----------
+    // ---------- Fila móvil (exactamente 1 base móvil) ----------
     private void SpawnMovingRow(int z, float yHeight, HashSet<int> blockedPositions, int forcedPathX)
     {
         if (movingBasePrefab == null)
@@ -242,21 +249,19 @@ public class GameManager : MonoBehaviour
         TrySpawnFlyOnBase(mb.transform);
     }
 
-    // ---------- Spawn de PowerUps (prefab por tipo, 0 o 1 por base) ----------
+    // ---------- Spawn de PowerUps (0 o 1 por base) con SOCKET ----------
     private void TrySpawnPowerup(Transform baseTransform)
     {
         if (baseTransform == null) return;
 
-        var candidates = new List<(PowerUp prefab, float chance)>(5);
-        if (megaJumpPrefab != null && megaJumpDropChance > 0f) candidates.Add((megaJumpPrefab, megaJumpDropChance));
+        var candidates = new List<(PowerUp prefab, float chance)>(4);
         if (slowSpeedPrefab != null && slowSpeedDropChance > 0f) candidates.Add((slowSpeedPrefab, slowSpeedDropChance));
         if (fastSpeedPrefab != null && fastSpeedDropChance > 0f) candidates.Add((fastSpeedPrefab, fastSpeedDropChance));
         if (slowStaminaPrefab != null && slowStaminaDropChance > 0f) candidates.Add((slowStaminaPrefab, slowStaminaDropChance));
         if (extraLifePrefab != null && extraLifeDropChance > 0f) candidates.Add((extraLifePrefab, extraLifeDropChance));
-
         if (candidates.Count == 0) return;
 
-        // Shuffle simple para evitar sesgo
+        // Shuffle simple
         for (int i = 0; i < candidates.Count; i++)
         {
             int j = Random.Range(i, candidates.Count);
@@ -265,15 +270,37 @@ public class GameManager : MonoBehaviour
 
         foreach (var c in candidates)
         {
-            if (Random.value <= c.chance)
-            {
-                var pu = Instantiate(c.prefab, baseTransform);
-                pu.transform.localPosition = powerupLocalOffset;
+            if (Random.value > c.chance) continue;
 
-                if (pu.TryGetComponent<Collider>(out var col) && !col.isTrigger) col.isTrigger = true;
-                break; // 1 por base
+            // 1) Si existe socket, lo usamos
+            Transform socket = FindChildRecursive(baseTransform, powerupSocketName);
+            if (socket != null)
+            {
+                var pu = Instantiate(c.prefab, socket);
+                pu.gameObject.SetActive(true);
+                pu.transform.localPosition = Vector3.up * powerupExtraOffsetY;
+                if (pu.TryGetComponent<Collider>(out var col)) col.isTrigger = true;
+                break;
             }
+
+            // 2) Fallback: offset local respecto a la base
+            var fallback = Instantiate(c.prefab, baseTransform);
+            fallback.gameObject.SetActive(true);
+            fallback.transform.localPosition = powerupLocalOffset;
+            if (fallback.TryGetComponent<Collider>(out var col2)) col2.isTrigger = true;
+            break;
         }
+    }
+
+    private Transform FindChildRecursive(Transform root, string name)
+    {
+        if (root.name == name) return root;
+        for (int i = 0; i < root.childCount; i++)
+        {
+            var t = FindChildRecursive(root.GetChild(i), name);
+            if (t != null) return t;
+        }
+        return null;
     }
 
     // ---------- Flies SOBRE bases ----------
@@ -381,18 +408,18 @@ public class GameManager : MonoBehaviour
     public void GrantExtraLife(int count = 1)
     {
         extraLives += Mathf.Max(1, count);
-        // TODO: actualizar HUD si tienes iconos de vidas
+        // TODO: actualizar HUD de vidas si procede
     }
 
     public bool TryConsumeExtraLife()
     {
         if (extraLives <= 0) return false;
         extraLives--;
-        // TODO: HUD
+        // TODO: actualizar HUD de vidas si procede
         return true;
     }
 
-    // ---------- (Opcional) Score multiplier si lo seguías usando ----------
+    // (Opcional) multiplicador de score si lo usas
     public void ActivateScoreMultiplier(float multiplier, float duration)
     {
         if (scoreMultiplierCoro != null) StopCoroutine(scoreMultiplierCoro);

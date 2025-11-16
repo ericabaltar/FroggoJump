@@ -2,7 +2,6 @@ using UnityEngine;
 
 public enum PowerUpType
 {
-    MegaJump,          // Como las botas de Subway Surfers
     SlowSpeed,         // Reducir velocidad del jugador
     FastSpeed,         // Aumentar velocidad del jugador
     SlowStaminaDrain,  // La estamina se gasta más lento
@@ -13,7 +12,7 @@ public enum PowerUpType
 public class PowerUp : MonoBehaviour
 {
     [Header("Tipo")]
-    public PowerUpType type = PowerUpType.MegaJump;
+    public PowerUpType type = PowerUpType.FastSpeed;
 
     [Header("Duración (si aplica)")]
     public float duration = 6f;
@@ -43,16 +42,9 @@ public class PowerUp : MonoBehaviour
 
         switch (type)
         {
-            case PowerUpType.MegaJump:
-                player.ApplyMegaJump(duration);
-                break;
-
             case PowerUpType.SlowSpeed:
-                player.ApplySpeedMultiplier(duration, Mathf.Max(0.05f, speedMultiplier)); // <1 = más lento
-                break;
-
             case PowerUpType.FastSpeed:
-                player.ApplySpeedMultiplier(duration, Mathf.Max(0.05f, speedMultiplier)); // >1 = más rápido
+                player.ApplySpeedMultiplier(duration, Mathf.Max(0.05f, speedMultiplier));
                 break;
 
             case PowerUpType.SlowStaminaDrain:

@@ -41,10 +41,6 @@ public class PlayerController : MonoBehaviour
     private float originalBaseMoveDuration;
     private Coroutine speedCoro;
 
-    // Mega salto: +1 casilla a Tap/Hold y no muere en road mientras dura
-    private bool megaJumpActive = false;
-    private Coroutine megaCoro;
-
     // Estamina se gasta más lento (factor de 0.05 a 1). 0.5 = gasta la mitad
     private float staminaDrainMultiplier = 1f;
     private float staminaResidue = 0f; // acumula gasto fraccional
@@ -80,9 +76,8 @@ public class PlayerController : MonoBehaviour
             Vector2Int moveDirection = bufferedInputDirection;
             TurnCharacter(moveDirection);
 
-            // Distancia: normal Tap=1, Hold=2. Con MegaJump, +1 casilla
+            // Distancia: Tap=1, Hold=2
             int tiles = (bufferedInputType == InputType.Tap) ? 1 : 2;
-            if (megaJumpActive) tiles += 1;
 
             Vector2Int destination = pos + moveDirection * tiles;
 
@@ -120,7 +115,7 @@ public class PlayerController : MonoBehaviour
             float percent = elapsedTime / currentMoveDuration;
 
             Vector3 newPos = Vector3.Lerp(startPos, endPos, percent);
-            float arc = megaJumpActive ? 0.9f : 0.5f; // arco más alto con mega salto
+            float arc = 0.5f;
             newPos.y = yHeight + (arc * Mathf.Sin(Mathf.PI * percent));
             transform.position = newPos;
 
@@ -140,9 +135,9 @@ public class PlayerController : MonoBehaviour
         pos = destination;
         GameManager.Instance.UpdateFarthestDistance(destination.y);
 
-        // Muerte en road solo si NO hay base estática, NO hay base móvil y NO hay mega salto activo
+        // Muerte en road si NO hay base estática y NO hay base móvil
         bool isRoadRow = GameManager.Instance.IsRoadRow(destination.y);
-        if (isRoadRow && !GameManager.Instance.HasBaseAt(pos) && !isOnMovingBase && !megaJumpActive)
+        if (isRoadRow && !GameManager.Instance.HasBaseAt(pos) && !isOnMovingBase)
         {
             Die();
             yield break;
@@ -255,8 +250,7 @@ public class PlayerController : MonoBehaviour
 
     private void DecreaseStamina(int baseCost)
     {
-        // Aplica multiplicador de gasto y acumula residuo fraccional.
-        // Por ejemplo, con factor 0.5 cada salto gasta 0.5 y en 2 saltos gasta 1.
+        // Aplica multiplicador de gasto y acumula residuo fraccional
         float effective = baseCost * Mathf.Max(0.05f, staminaDrainMultiplier);
         staminaResidue += effective;
 
@@ -337,21 +331,6 @@ public class PlayerController : MonoBehaviour
         baseMoveDuration = originalBaseMoveDuration;
         currentMoveDuration = baseMoveDuration;
         speedCoro = null;
-    }
-
-    // Mega salto estilo Subway Surfers: +1 casilla y no muere al caer en road mientras dure.
-    public void ApplyMegaJump(float duration)
-    {
-        if (megaCoro != null) StopCoroutine(megaCoro);
-        megaCoro = StartCoroutine(MegaJumpRoutine(duration));
-    }
-
-    private IEnumerator MegaJumpRoutine(float duration)
-    {
-        megaJumpActive = true;
-        yield return new WaitForSeconds(duration);
-        megaJumpActive = false;
-        megaCoro = null;
     }
 
     // Reduce el gasto de estamina durante un tiempo. Factor entre 0.05 y 1.0 (1.0 = gasto normal)
