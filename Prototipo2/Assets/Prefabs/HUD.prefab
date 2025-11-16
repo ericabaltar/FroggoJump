@@ -49,7 +49,7 @@ GameObject:
   - component: {fileID: 7625558770353820038}
   - component: {fileID: 8810654475897691415}
   m_Layer: 5
-  m_Name: Background
+  m_Name: Frame
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -305,6 +305,16 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   staminaBarFill: {fileID: 6638149139437785735}
   scoreText: {fileID: 6027775959338057584}
+  staminaBarRoot: {fileID: 0}
+  staminaSmoothTime: 0.12
+  lowStaminaThreshold: 0.15
+  fillNormal: {r: 0.36, g: 0.8, b: 0.46, a: 1}
+  fillLow: {r: 0.95, g: 0.3, b: 0.25, a: 1}
+  lowBlinkSpeed: 6
+  playPopOnIncrease: 1
+  popScale: 1.06
+  popTime: 0.08
+  scoreFixedDigits: 0
 --- !u!1 &7455510980113183917
 GameObject:
   m_ObjectHideFlags: 0
