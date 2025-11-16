@@ -1088,6 +1088,10 @@ PrefabInstance:
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 3859348135394012647, guid: 5479be6b53bcbef4c8efe89a3c97597c, type: 3}
+      propertyPath: debugLog
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 3859348135394012647, guid: 5479be6b53bcbef4c8efe89a3c97597c, type: 3}
       propertyPath: randomTiltXZ
       value: 1
       objectReference: {fileID: 0}
@@ -1145,7 +1149,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3859348135394012647, guid: 5479be6b53bcbef4c8efe89a3c97597c, type: 3}
       propertyPath: applyRandomToAllObstacles
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -4259,6 +4263,26 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2214329307779361778, guid: 8d5b3800fb4d3ca41b074ce89f5da462, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6027775959338057584, guid: 8d5b3800fb4d3ca41b074ce89f5da462, type: 3}
+      propertyPath: m_fontSize
+      value: 40
+      objectReference: {fileID: 0}
+    - target: {fileID: 6027775959338057584, guid: 8d5b3800fb4d3ca41b074ce89f5da462, type: 3}
+      propertyPath: m_fontAsset
+      value: 
+      objectReference: {fileID: 11400000, guid: 9b9a702f4ba5fa74888cfb402caf7842, type: 2}
+    - target: {fileID: 6027775959338057584, guid: 8d5b3800fb4d3ca41b074ce89f5da462, type: 3}
+      propertyPath: m_fontSizeBase
+      value: 40
+      objectReference: {fileID: 0}
+    - target: {fileID: 6027775959338057584, guid: 8d5b3800fb4d3ca41b074ce89f5da462, type: 3}
+      propertyPath: m_sharedMaterial
+      value: 
+      objectReference: {fileID: 4392120798918709796, guid: 9b9a702f4ba5fa74888cfb402caf7842, type: 2}
+    - target: {fileID: 6027775959338057584, guid: 8d5b3800fb4d3ca41b074ce89f5da462, type: 3}
+      propertyPath: m_hasFontAssetChanged
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 7329199718231748005, guid: 8d5b3800fb4d3ca41b074ce89f5da462, type: 3}
