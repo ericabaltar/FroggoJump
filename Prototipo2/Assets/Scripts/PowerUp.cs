@@ -22,8 +22,8 @@ public class PowerUp : MonoBehaviour
     public float speedMultiplier = 1.5f;   // FastSpeed: 1.5, SlowSpeed: 0.6 por ejemplo
 
     [Header("Parámetros de estamina")]
-    [Tooltip("Multiplicador del gasto de estamina (<1 gasta menos). Ej: 0.5 = gasta la mitad")]
-    public float staminaDrainMultiplier = 0.5f;
+    public int staminaRegenPerInterval = 1;
+    public float regenInterval = 0.5f;
 
     [Header("Vidas")]
     public int extraLives = 1;
@@ -50,7 +50,7 @@ public class PowerUp : MonoBehaviour
                 break;
 
             case PowerUpType.StaminaRegen:
-                player.ApplyStaminaDrainModifier(duration, Mathf.Clamp(staminaDrainMultiplier, 0.05f, 1f));
+                player.ApplyStaminaRegeneration(1, 0.5f, duration);
                 break;
 
             case PowerUpType.ExtraLife:

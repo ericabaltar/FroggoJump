@@ -407,19 +407,20 @@ public class PlayerController : MonoBehaviour
         speedCoro = null;
     }
 
-    // Reduce el gasto de estamina durante un tiempo. Factor entre 0.05 y 1.0 (1.0 = gasto normal)
-    public void ApplyStaminaDrainModifier(float duration, float factor)
+    public void ApplyStaminaRegeneration(int amountPerTick, float interval, float duration)
     {
-        factor = Mathf.Clamp(factor, 0.05f, 1f);
-        if (staminaCoro != null) StopCoroutine(staminaCoro);
-        staminaCoro = StartCoroutine(StaminaDrainRoutine(duration, factor));
+        StartCoroutine(StaminaRegenRoutine(amountPerTick, interval, duration));
     }
 
-    private IEnumerator StaminaDrainRoutine(float duration, float factor)
+    private IEnumerator StaminaRegenRoutine(int amountPerTick, float interval, float duration)
     {
-        staminaDrainMultiplier = factor;
-        yield return new WaitForSeconds(duration);
-        staminaDrainMultiplier = 1f;
-        staminaCoro = null;
+        float elapsed = 0f;
+
+        while (elapsed < duration)
+        {
+            AddStamina(amountPerTick);
+            yield return new WaitForSeconds(interval);
+            elapsed += interval;
+        }
     }
 }

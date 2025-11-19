@@ -68,9 +68,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   type: 2
-  duration: 6
+  duration: 20
   speedMultiplier: 1.5
-  staminaDrainMultiplier: 0.5
+  staminaRegenPerInterval: 1
+  regenInterval: 0.5
   extraLives: 1
 --- !u!1001 &9020400491755687261
 PrefabInstance:
