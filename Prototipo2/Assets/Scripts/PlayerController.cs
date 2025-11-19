@@ -8,6 +8,7 @@ using UnityEngine.InputSystem.Controls;
 public class PlayerController : MonoBehaviour
 {
     [SerializeField] private float baseMoveDuration = 0.2f;
+    [SerializeField] private float slowMoveDuration = 1f;
     [SerializeField] private int maxStamina = 15;
     [SerializeField] private float inputBufferTime = 0.15f;
     [SerializeField] private float holdTime = 0.5f;
@@ -65,14 +66,8 @@ public class PlayerController : MonoBehaviour
     {
         HandleInput();
 
-        // Sin stamina no se aceptan saltos
-        if (currentStamina <= 0)
-            bufferedInputDirection = Vector2Int.zero;
-
         if (state == PlayerState.Ready && bufferedInputDirection != Vector2Int.zero)
         {
-            if (currentStamina <= 0) return;
-
             Vector2Int moveDirection = bufferedInputDirection;
             TurnCharacter(moveDirection);
 
@@ -93,6 +88,9 @@ public class PlayerController : MonoBehaviour
 
     private IEnumerator MoveCharacter(Vector2Int destination)
     {
+        // Gasto de estamina por salto (con multiplicador de gasto)
+        DecreaseStamina(1);
+
         state = PlayerState.Moving;
 
         // Soltar plataforma antes de saltar
@@ -127,9 +125,6 @@ public class PlayerController : MonoBehaviour
 
         transform.position = endPos;
         transform.localRotation = Quaternion.Euler(0f, startYaw, 0f);
-
-        // Gasto de estamina por salto (con multiplicador de gasto)
-        DecreaseStamina(1);
 
         // Actualiza grid y score
         pos = destination;
@@ -280,6 +275,11 @@ public class PlayerController : MonoBehaviour
         currentStamina = Mathf.Clamp(value, 0, maxStamina);
         if (HudManager.Instance != null)
             HudManager.Instance.SetStaminaBar((float)currentStamina / maxStamina);
+
+        if (currentStamina == 0)
+            currentMoveDuration = slowMoveDuration;
+        else
+            currentMoveDuration = baseMoveDuration;
     }
 
     private void DecreaseStamina(int baseCost)
