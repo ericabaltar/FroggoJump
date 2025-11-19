@@ -150,7 +150,7 @@ ModelImporter:
       name: FrogJumpAnim
       takeName: Armature|ArmatureAction
       internalID: 4112734611506483818
-      firstFrame: 120
+      firstFrame: 124
       lastFrame: 150
       wrapMode: 0
       orientationOffsetY: 0

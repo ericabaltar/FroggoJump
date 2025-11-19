@@ -28,6 +28,8 @@ public class PlayerController : MonoBehaviour
 
     private Vector2Int pos;
 
+    private enum MovementSpeed { Slow, Regular }
+    MovementSpeed currentMovementSpeed = MovementSpeed.Regular;
     float currentMoveDuration;
     int currentStamina;
 
@@ -279,9 +281,27 @@ public class PlayerController : MonoBehaviour
             HudManager.Instance.SetStaminaBar((float)currentStamina / maxStamina);
 
         if (currentStamina == 0)
-            currentMoveDuration = slowMoveDuration;
+            ChangeMovementSpeed(MovementSpeed.Slow);
         else
+            ChangeMovementSpeed(MovementSpeed.Regular);
+    }
+
+    private void ChangeMovementSpeed(MovementSpeed newMovementSpeed)
+    {
+        if (currentMovementSpeed == newMovementSpeed) return;
+
+        if (newMovementSpeed == MovementSpeed.Slow)
+        {
+            currentMoveDuration = slowMoveDuration;
+            animator.SetFloat("JumpSpeedMult", 0.2f);
+        }
+        else
+        {
             currentMoveDuration = baseMoveDuration;
+            animator.SetFloat("JumpSpeedMult", 1f);
+        }
+
+        currentMovementSpeed = newMovementSpeed;
     }
 
     private void DecreaseStamina(int baseCost)

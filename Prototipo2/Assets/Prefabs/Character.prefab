@@ -54,7 +54,7 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 0.75, y: 0.75, z: 0.75}
+  m_Size: {x: 0.7, y: 0.7, z: 0.7}
   m_Center: {x: 0, y: 0.38, z: 0}
 --- !u!54 &7502870243150697541
 Rigidbody:
@@ -97,9 +97,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   animator: {fileID: 8814872322374376441}
   baseMoveDuration: 0.2
-  maxStamina: 100
+  slowMoveDuration: 1
+  maxStamina: 25
   inputBufferTime: 0.15
-  maxTimeBetweenSameInputs: 0.01
   holdTime: 0.5
 --- !u!1001 &5890108064528261025
 PrefabInstance:
