@@ -92,6 +92,8 @@ public class PlayerController : MonoBehaviour
 
     private IEnumerator MoveCharacter(Vector2Int destination)
     {
+        transform.localScale = Vector3.one;
+
         // Gasto de estamina por salto (con multiplicador de gasto)
         DecreaseStamina(1);
 
@@ -204,9 +206,23 @@ public class PlayerController : MonoBehaviour
                 totalDir += kv.Value.direction;
             }
 
+            if (duration < holdTime)
+            {
+                float t = duration / holdTime * 2f;
+                float yScale = Mathf.Lerp(1f, 0.8f, t);
+                transform.localScale = new Vector3(1f, yScale, 1f);
+            }
+            else
+            {
+                float vibrate = 0.825f + 0.025f * Mathf.Sin(Time.time * 20f);
+                transform.localScale = new Vector3(1f, vibrate, 1f);
+            }
+
             if (key.wasReleasedThisFrame)
             {
                 inputHeldTimes.Clear();
+
+                transform.localScale = Vector3.one;
 
                 if (duration < holdTime)
                     AddInputToBuffer(totalDir, InputType.Tap);
