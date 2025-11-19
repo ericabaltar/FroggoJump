@@ -5,7 +5,7 @@ using static UnityEngine.GraphicsBuffer;
 
 public class CameraMovement : MonoBehaviour
 {
-    [SerializeField] float distanceThreshold = 0.01f;
+    //[SerializeField] float distanceThreshold = 0.01f;
 
     Vector3 velocity = Vector3.zero;
     float smoothTime = 0.3f;

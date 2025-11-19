@@ -9,9 +9,9 @@ public class PlayerController : MonoBehaviour
 {
     [SerializeField] private Animator animator;
     [SerializeField] private float baseMoveDuration = 0.2f;
+    [SerializeField] private float slowMoveDuration = 1f;
     [SerializeField] private int maxStamina = 15;
     [SerializeField] private float inputBufferTime = 0.15f;
-    [SerializeField] private float maxTimeBetweenSameInputs = 0.01f;
     [SerializeField] private float holdTime = 0.5f;
 
     private enum InputType { Tap, Hold }
@@ -20,62 +20,62 @@ public class PlayerController : MonoBehaviour
     private InputType bufferedInputType;
     private float bufferTimeLeft = 0f;
 
-    struct InputInfo
-    {
-        public float timeHeld;
-        public Vector2Int direction;
-    }
-    private Dictionary<Key, InputInfo> inputHeldTimes = new Dictionary<Key, InputInfo>();
+    struct InputInfo { public float timeHeld; public Vector2Int direction; }
+    private readonly Dictionary<Key, InputInfo> inputHeldTimes = new();
 
-    private enum PlayerState
-    {
-        Ready,
-        Moving,
-        Dead
-    }
-
+    private enum PlayerState { Ready, Moving, Dead }
     private PlayerState state = PlayerState.Ready;
+
     private Vector2Int pos;
 
     float currentMoveDuration;
     int currentStamina;
 
-    // --- Bases m�viles (nen�fares) ---
+    // Plataformas móviles
     private bool isOnMovingBase = false;
     private MovingBase currentMovingBase = null;
 
-    // Guardamos el padre previo para restaurarlo si hace falta
     private Transform defaultParent;
+
+    // --------- POWERUPS / EFECTOS ---------
+    // Velocidad: moveDuration = original / speedMultiplier
+    private float speedMultiplier = 1f;
+    private float originalBaseMoveDuration;
+    private Coroutine speedCoro;
+
+    // Estamina se gasta más lento (factor de 0.05 a 1). 0.5 = gasta la mitad
+    private float staminaDrainMultiplier = 1f;
+    private float staminaResidue = 0f; // acumula gasto fraccional
+    private Coroutine staminaCoro;
 
     void Start()
     {
-        // Posición inicial en la grid
         pos = new Vector2Int(0, 0);
         transform.position = new Vector3(0, 0.2f, 0);
 
+        originalBaseMoveDuration = baseMoveDuration;
         currentMoveDuration = baseMoveDuration;
         currentStamina = maxStamina;
 
         defaultParent = transform.parent;
+
+        if (HudManager.Instance != null)
+            HudManager.Instance.SetStaminaBar((float)currentStamina / maxStamina);
     }
 
     void Update()
     {
         HandleInput();
 
-        // If the user wants to move
         if (state == PlayerState.Ready && bufferedInputDirection != Vector2Int.zero)
         {
             Vector2Int moveDirection = bufferedInputDirection;
-
             TurnCharacter(moveDirection);
 
-            // Move one or two tiles
-            Vector2Int destination;
-            if (bufferedInputType == InputType.Tap)
-                destination = pos + moveDirection;
-            else
-                destination = pos + moveDirection * 2;
+            // Distancia: Tap=1, Hold=2
+            int tiles = (bufferedInputType == InputType.Tap) ? 1 : 2;
+
+            Vector2Int destination = pos + moveDirection * tiles;
 
             if (GameManager.Instance.CheckIfAccessible(destination))
             {
@@ -85,106 +85,82 @@ public class PlayerController : MonoBehaviour
         }
 
         if (isOnMovingBase)
-        {
-            // Update grid positon
             pos.x = Mathf.RoundToInt(transform.position.x);
-        }
     }
 
     private IEnumerator MoveCharacter(Vector2Int destination)
     {
+        // Gasto de estamina por salto (con multiplicador de gasto)
+        DecreaseStamina(1);
+
         state = PlayerState.Moving;
 
-        // Si estamos subidos a una base m�vil, soltamos antes de saltar
+        // Soltar plataforma antes de saltar
         if (currentMovingBase != null)
-        {
-            transform.SetParent(defaultParent, true); // mantener world pos
-        }
+            transform.SetParent(defaultParent, true);
 
         float elapsedTime = 0f;
 
-        // Altura según el tipo de terreno de la fila destino
         float yHeight = 0.2f;
         if (destination.y >= 0)
-        {
             yHeight = GameManager.Instance.GetTerrainHeight(destination.y);
-        }
 
         Vector3 startPos = transform.position;
         Vector3 endPos = new Vector3(destination.x, yHeight, destination.y);
 
-        Quaternion startRotation = transform.localRotation;
+        float startYaw = transform.localEulerAngles.y;
 
         while (elapsedTime < currentMoveDuration)
         {
-            float percent = elapsedTime / baseMoveDuration;
+            float percent = elapsedTime / currentMoveDuration;
 
-            // Interpolación + arco de salto
             Vector3 newPos = Vector3.Lerp(startPos, endPos, percent);
-            newPos.y = yHeight + (0.5f * Mathf.Sin(Mathf.PI * percent));
+            float arc = 0.5f;
+            newPos.y = yHeight + (arc * Mathf.Sin(Mathf.PI * percent));
             transform.position = newPos;
 
-            // Pequeño bamboleo en X (como ya tenías)
-            Vector3 rotation = transform.localRotation.eulerAngles;
-            transform.localRotation = Quaternion.Euler(
-                -5f * Mathf.PI * Mathf.Cos(Mathf.PI * percent),
-                rotation.y,
-                rotation.z
-            );
+            transform.localRotation = Quaternion.Euler(0f, startYaw, 0f);
 
             elapsedTime += Time.deltaTime;
             yield return null;
         }
 
-        // Aseguramos posición final
         transform.position = endPos;
-        transform.localRotation = startRotation;
+        transform.localRotation = Quaternion.Euler(0f, startYaw, 0f);
 
+        // Actualiza grid y score
         pos = destination;
         GameManager.Instance.UpdateFarthestDistance(destination.y);
 
-        // --- L�GICA DE MUERTE: solo Road sin base est�tica y sin base m�vil ---
+        // Muerte en road si NO hay base estática y NO hay base móvil
         bool isRoadRow = GameManager.Instance.IsRoadRow(destination.y);
-
         if (isRoadRow && !GameManager.Instance.HasBaseAt(pos) && !isOnMovingBase)
         {
             Die();
             yield break;
         }
 
-        DecreaseStamina();
-
         if (state == PlayerState.Moving)
         {
             state = PlayerState.Ready;
 
-            // Si hemos aterrizado encima de una base m�vil (trigger activo),
-            // nos volvemos a subir (parentar) para movernos juntos.
             if (isOnMovingBase && currentMovingBase != null)
-            {
                 GetOnMovingPlatform(currentMovingBase);
-            }
             else
-            {
                 transform.SetParent(defaultParent, true);
-            }
         }
     }
 
     private void HandleInput()
     {
-        // Detect arrow key presses.
         DetectDirectionalInput(Keyboard.current.upArrowKey, Vector2Int.up);
         DetectDirectionalInput(Keyboard.current.downArrowKey, Vector2Int.down);
         DetectDirectionalInput(Keyboard.current.leftArrowKey, Vector2Int.left);
         DetectDirectionalInput(Keyboard.current.rightArrowKey, Vector2Int.right);
 
-        // Reduce buffer time left
         if (bufferTimeLeft > 0f)
         {
             bufferTimeLeft -= Time.deltaTime;
-
-            // Remove the save input if enough time has passed
             if (bufferTimeLeft <= 0f)
                 bufferedInputDirection = Vector2Int.zero;
         }
@@ -199,123 +175,151 @@ public class PlayerController : MonoBehaviour
 
     void DetectDirectionalInput(KeyControl key, Vector2Int direction)
     {
+        if (key == null) return;
+
         if (key.wasPressedThisFrame)
         {
-            InputInfo info = new InputInfo
-            {
-                timeHeld = 0f,
-                direction = direction
-            };
-
-            // Add key to dictionary when pressed
-            inputHeldTimes[key.keyCode] = info;
+            inputHeldTimes[key.keyCode] = new InputInfo { timeHeld = 0f, direction = direction };
 
             if (state == PlayerState.Ready)
             {
-                Vector2Int currentTotalDirection = Vector2Int.zero;
-                foreach (InputInfo infoo in inputHeldTimes.Values)
-                    currentTotalDirection += infoo.direction;
-
-                TurnCharacter(currentTotalDirection);
+                Vector2Int total = Vector2Int.zero;
+                foreach (var kv in inputHeldTimes) total += kv.Value.direction;
+                TurnCharacter(total);
             }
-
         }
 
-        // If the key is being held (exists in the dictionary)
-        if (inputHeldTimes.TryGetValue(key.keyCode, out InputInfo inputInfo))
+        if (inputHeldTimes.TryGetValue(key.keyCode, out InputInfo info))
         {
-            // Update time held
-            inputInfo.timeHeld += Time.deltaTime;
-            inputHeldTimes[key.keyCode] = inputInfo;
+            info.timeHeld += Time.deltaTime;
+            inputHeldTimes[key.keyCode] = info;
 
             float duration = 0f;
-            Vector2Int totalMovementDirection = Vector2Int.zero;
-            foreach (InputInfo info in inputHeldTimes.Values)
+            Vector2Int totalDir = Vector2Int.zero;
+            foreach (var kv in inputHeldTimes)
             {
-                // Get duration of the current pressed key that was held longer
-                if (info.timeHeld > duration)
-                    duration = info.timeHeld;
-
-                // Get total movement direction
-                totalMovementDirection += info.direction;
+                if (kv.Value.timeHeld > duration) duration = kv.Value.timeHeld;
+                totalDir += kv.Value.direction;
             }
 
-            if (duration > holdTime)
-            {
-                // Feedback for the player to know if the movement will be tap or hold
-            }
-
-            // When the key is released, remove it from the dictionary and add the input to the buffer
             if (key.wasReleasedThisFrame)
             {
                 inputHeldTimes.Clear();
 
                 if (duration < holdTime)
-                {
-                    AddInputToBuffer(totalMovementDirection, InputType.Tap);
-                }
+                    AddInputToBuffer(totalDir, InputType.Tap);
                 else
-                {
-                    AddInputToBuffer(totalMovementDirection, InputType.Hold);
-                }
+                    AddInputToBuffer(totalDir, InputType.Hold);
             }
         }
     }
 
     private void Die()
     {
-        if (state == PlayerState.Dead)
+        // Si tienes una vida extra, cancela la muerte
+        if (GameManager.Instance != null && GameManager.Instance.TryConsumeExtraLife())
+        {
+            state = PlayerState.Ready;
+            transform.SetParent(defaultParent, true);
             return;
+        }
 
+        if (state == PlayerState.Dead) return;
         state = PlayerState.Dead;
-        transform.SetParent(defaultParent, true); // por si est�bamos parentados
-        Debug.Log("Has pisado carretera sin base. GAME OVER.");
+
+        // Asegura que no sigues “enganchado” a plataformas
+        isOnMovingBase = false;
+        currentMovingBase = null;
+        transform.SetParent(defaultParent, true);
+
+        // Anula cualquier input pendiente y corutinas de movimiento
+        bufferedInputDirection = Vector2Int.zero;
+        StopAllCoroutines();
+
+        // (Opcional) desactivar colisiones mientras dura la transición
+        var col = GetComponent<Collider>();
+        if (col) col.enabled = false;
+
+        // Lanza la transición de foco (si no está en escena, fallback a log)
+        var spotlight = DeathSpotlightController.Instance;
+        if (spotlight != null)
+        {
+            spotlight.Play(this.transform, OnDeathFocusComplete);
+        }
+        else
+        {
+            Debug.Log("Has muerto. (DeathSpotlightController no encontrado)");
+            OnDeathFocusComplete();
+        }
     }
+
+    // Callback al terminar la animación del foco
+    private void OnDeathFocusComplete()
+    {
+        // Aquí decides qué hacer: game over, respawn, recargar escena, etc.
+        // Ejemplos:
+        // UnityEngine.SceneManagement.SceneManager.LoadScene("GameOver");
+        // o GameManager.Instance.ShowGameOver();
+        Debug.Log("Fin de transición de muerte.");
+    }
+
 
     void TurnCharacter(Vector2Int moveDirection)
     {
-        // Rotaci�n hacia la direcci�n real (incluye diagonales)
+        if (moveDirection == Vector2Int.zero) return;
         float yaw = Mathf.Atan2(moveDirection.x, moveDirection.y) * Mathf.Rad2Deg;
         transform.localRotation = Quaternion.Euler(0f, yaw, 0f);
     }
 
-    void IncreaseStamina()
+    // ------- STAMINA -------
+    private void SetStamina(int value)
     {
-        currentStamina = maxStamina;
-        currentMoveDuration = baseMoveDuration;
+        currentStamina = Mathf.Clamp(value, 0, maxStamina);
+        if (HudManager.Instance != null)
+            HudManager.Instance.SetStaminaBar((float)currentStamina / maxStamina);
 
-        HudManager.Instance.SetStaminaBar((float)currentStamina / maxStamina);
+        if (currentStamina == 0)
+            currentMoveDuration = slowMoveDuration;
+        else
+            currentMoveDuration = baseMoveDuration;
     }
 
-    void DecreaseStamina()
+    private void DecreaseStamina(int baseCost)
     {
-        if (currentStamina > 0)
+        // Aplica multiplicador de gasto y acumula residuo fraccional
+        float effective = baseCost * Mathf.Max(0.05f, staminaDrainMultiplier);
+        staminaResidue += effective;
+
+        int spend = Mathf.FloorToInt(staminaResidue);
+        if (spend > 0)
         {
-            currentStamina -= 1;
-
-            if (currentStamina == 0)
-            {
-                currentMoveDuration = baseMoveDuration * 5f;
-            }
+            staminaResidue -= spend;
+            SetStamina(currentStamina - spend);
         }
-
-        HudManager.Instance.SetStaminaBar((float)currentStamina / maxStamina);
     }
 
-    void GetOnMovingPlatform(MovingBase currentMovingBase)
+    private void AddStamina(int amount)
+    {
+        if (amount <= 0) return;
+        SetStamina(currentStamina + amount);
+    }
+
+    void GetOnMovingPlatform(MovingBase movingBase)
     {
         isOnMovingBase = true;
+        currentMovingBase = movingBase;
         transform.SetParent(currentMovingBase.transform, true);
-        transform.position = new Vector3(currentMovingBase.transform.position.x, currentMovingBase.transform.position.y, currentMovingBase.transform.position.z);
+        transform.position = currentMovingBase.transform.position;
     }
-
 
     // --- Triggers: Fly y MovingBase ---
     private void OnTriggerEnter(Collider other)
     {
         if (other.CompareTag("Fly"))
         {
-            IncreaseStamina();
+            var fly = other.GetComponent<Fly>();
+            int amount = (fly != null) ? fly.staminaAmount : 1;
+            AddStamina(amount);
             Destroy(other.gameObject);
         }
         else if (!isOnMovingBase && other.CompareTag("MovingBase"))
@@ -323,11 +327,8 @@ public class PlayerController : MonoBehaviour
             isOnMovingBase = true;
             currentMovingBase = other.GetComponent<MovingBase>();
 
-            // Solo nos subimos si no estamos en mitad de un salto
             if (state == PlayerState.Ready && currentMovingBase != null)
-            {
                 GetOnMovingPlatform(currentMovingBase);
-            }
         }
     }
 
@@ -335,7 +336,6 @@ public class PlayerController : MonoBehaviour
     {
         if (other.CompareTag("MovingBase"))
         {
-            // Si sales de la base m�vil, deja de ser su hijo
             if (other.GetComponent<MovingBase>() == currentMovingBase)
             {
                 isOnMovingBase = false;
@@ -343,5 +343,45 @@ public class PlayerController : MonoBehaviour
                 transform.SetParent(defaultParent, true);
             }
         }
+    }
+
+    // ================== MÉTODOS PARA POWERUPS ==================
+
+    // Cambia la velocidad durante un tiempo: moveDuration = original / multiplier
+    // multiplier > 1 acelera; multiplier < 1 desacelera
+    public void ApplySpeedMultiplier(float duration, float multiplier)
+    {
+        if (speedCoro != null) StopCoroutine(speedCoro);
+        speedCoro = StartCoroutine(SpeedRoutine(duration, Mathf.Max(0.05f, multiplier)));
+    }
+
+    private IEnumerator SpeedRoutine(float duration, float multiplier)
+    {
+        speedMultiplier = multiplier;
+        baseMoveDuration = originalBaseMoveDuration / speedMultiplier;
+        currentMoveDuration = baseMoveDuration;
+
+        yield return new WaitForSeconds(duration);
+
+        speedMultiplier = 1f;
+        baseMoveDuration = originalBaseMoveDuration;
+        currentMoveDuration = baseMoveDuration;
+        speedCoro = null;
+    }
+
+    // Reduce el gasto de estamina durante un tiempo. Factor entre 0.05 y 1.0 (1.0 = gasto normal)
+    public void ApplyStaminaDrainModifier(float duration, float factor)
+    {
+        factor = Mathf.Clamp(factor, 0.05f, 1f);
+        if (staminaCoro != null) StopCoroutine(staminaCoro);
+        staminaCoro = StartCoroutine(StaminaDrainRoutine(duration, factor));
+    }
+
+    private IEnumerator StaminaDrainRoutine(float duration, float factor)
+    {
+        staminaDrainMultiplier = factor;
+        yield return new WaitForSeconds(duration);
+        staminaDrainMultiplier = 1f;
+        staminaCoro = null;
     }
 }
