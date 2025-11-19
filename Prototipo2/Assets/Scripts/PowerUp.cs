@@ -2,9 +2,9 @@ using UnityEngine;
 
 public enum PowerUpType
 {
-    SlowSpeed,         // Reducir velocidad del jugador
+    MoreRange,         // Reducir velocidad del jugador
     FastSpeed,         // Aumentar velocidad del jugador
-    SlowStaminaDrain,  // La estamina se gasta más lento
+    StaminaRegen,      // La estamina se gasta más lento
     ExtraLife          // Vida extra (uso único)
 }
 
@@ -42,12 +42,14 @@ public class PowerUp : MonoBehaviour
 
         switch (type)
         {
-            case PowerUpType.SlowSpeed:
+            case PowerUpType.MoreRange:
+
+                break;
             case PowerUpType.FastSpeed:
                 player.ApplySpeedMultiplier(duration, Mathf.Max(0.05f, speedMultiplier));
                 break;
 
-            case PowerUpType.SlowStaminaDrain:
+            case PowerUpType.StaminaRegen:
                 player.ApplyStaminaDrainModifier(duration, Mathf.Clamp(staminaDrainMultiplier, 0.05f, 1f));
                 break;
 
