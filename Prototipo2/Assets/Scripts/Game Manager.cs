@@ -309,14 +309,14 @@ public class GameManager : MonoBehaviour
         if (flyPrefab == null || baseTransform == null) return;
         if (Random.value > flyOnBaseChance) return;
 
-        var go = Instantiate(flyPrefab, baseTransform);
+        GameObject go = Instantiate(flyPrefab, baseTransform);
         go.SetActive(true);
-        go.transform.localPosition = flyOnBaseLocalOffset;
 
-        var fly = go.GetComponent<Fly>();
+        Fly fly = go.GetComponent<Fly>();
         if (fly == null) fly = go.AddComponent<Fly>();
+        fly.SetBasePos(flyOnBaseLocalOffset);
 
-        var col = go.GetComponent<Collider>();
+        Collider col = go.GetComponent<Collider>();
         if (col == null) col = go.AddComponent<SphereCollider>();
         col.isTrigger = true;
 
@@ -341,14 +341,14 @@ public class GameManager : MonoBehaviour
 
             int x = Random.Range(minX, maxX + 1);
 
-            var go = Instantiate(flyPrefab, terrainHolder);
+            GameObject go = Instantiate(flyPrefab, terrainHolder);
             go.SetActive(true);
-            go.transform.position = new Vector3(x, yHeight + flyYOffset, z);
 
-            var fly = go.GetComponent<Fly>();
+            Fly fly = go.GetComponent<Fly>();
             if (fly == null) fly = go.AddComponent<Fly>();
+            fly.SetBasePos(new Vector3(x, yHeight + flyYOffset, z));
 
-            var col = go.GetComponent<Collider>();
+            Collider col = go.GetComponent<Collider>();
             if (col == null) col = go.AddComponent<SphereCollider>();
             col.isTrigger = true;
 

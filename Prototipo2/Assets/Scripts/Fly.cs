@@ -38,8 +38,15 @@ public class Fly : MonoBehaviour
         if (bob)
         {
             float y = Mathf.Sin(Time.time * bobSpeed) * bobAmplitude;
-            var p = basePos; p.y += y;
+            Vector3 p = basePos;
+            p.y += y;
+            
             transform.position = p;
         }
+    }
+
+    public void SetBasePos(Vector3 newBasePos)
+    {
+        basePos = newBasePos;
     }
 }
