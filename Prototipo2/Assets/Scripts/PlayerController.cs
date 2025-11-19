@@ -7,6 +7,7 @@ using UnityEngine.InputSystem.Controls;
 
 public class PlayerController : MonoBehaviour
 {
+    [SerializeField] private Animator animator;
     [SerializeField] private float baseMoveDuration = 0.2f;
     [SerializeField] private float slowMoveDuration = 1f;
     [SerializeField] private int maxStamina = 15;
@@ -27,6 +28,8 @@ public class PlayerController : MonoBehaviour
 
     private Vector2Int pos;
 
+    private enum MovementSpeed { Slow, Regular }
+    MovementSpeed currentMovementSpeed = MovementSpeed.Regular;
     float currentMoveDuration;
     int currentStamina;
 
@@ -78,6 +81,7 @@ public class PlayerController : MonoBehaviour
 
             if (GameManager.Instance.CheckIfAccessible(destination))
             {
+                animator.SetTrigger("JumpTrigger");
                 StartCoroutine(MoveCharacter(destination));
             }
         }
@@ -88,6 +92,8 @@ public class PlayerController : MonoBehaviour
 
     private IEnumerator MoveCharacter(Vector2Int destination)
     {
+        transform.localScale = Vector3.one;
+
         // Gasto de estamina por salto (con multiplicador de gasto)
         DecreaseStamina(1);
 
@@ -200,9 +206,23 @@ public class PlayerController : MonoBehaviour
                 totalDir += kv.Value.direction;
             }
 
+            if (duration < holdTime)
+            {
+                float t = duration / holdTime * 2f;
+                float yScale = Mathf.Lerp(1f, 0.8f, t);
+                transform.localScale = new Vector3(1f, yScale, 1f);
+            }
+            else
+            {
+                float vibrate = 0.825f + 0.025f * Mathf.Sin(Time.time * 20f);
+                transform.localScale = new Vector3(1f, vibrate, 1f);
+            }
+
             if (key.wasReleasedThisFrame)
             {
                 inputHeldTimes.Clear();
+
+                transform.localScale = Vector3.one;
 
                 if (duration < holdTime)
                     AddInputToBuffer(totalDir, InputType.Tap);
@@ -277,9 +297,27 @@ public class PlayerController : MonoBehaviour
             HudManager.Instance.SetStaminaBar((float)currentStamina / maxStamina);
 
         if (currentStamina == 0)
-            currentMoveDuration = slowMoveDuration;
+            ChangeMovementSpeed(MovementSpeed.Slow);
         else
+            ChangeMovementSpeed(MovementSpeed.Regular);
+    }
+
+    private void ChangeMovementSpeed(MovementSpeed newMovementSpeed)
+    {
+        if (currentMovementSpeed == newMovementSpeed) return;
+
+        if (newMovementSpeed == MovementSpeed.Slow)
+        {
+            currentMoveDuration = slowMoveDuration;
+            animator.SetFloat("JumpSpeedMult", 0.2f);
+        }
+        else
+        {
             currentMoveDuration = baseMoveDuration;
+            animator.SetFloat("JumpSpeedMult", 1f);
+        }
+
+        currentMovementSpeed = newMovementSpeed;
     }
 
     private void DecreaseStamina(int baseCost)
