@@ -319,6 +319,7 @@ public class PlayerController : MonoBehaviour
         }
 
         currentMovementSpeed = newMovementSpeed;
+
     }
 
     private void DecreaseStamina(int baseCost)
