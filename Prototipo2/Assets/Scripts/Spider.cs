@@ -1,5 +1,6 @@
 using Mono.Cecil;
 using Unity.VisualScripting;
+using UnityEditor;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -39,7 +40,7 @@ public class Spider : MonoBehaviour
         if (collision.gameObject == frog)
         {
             Destroy(frog);
-            SceneManager.LoadScene("Level1");
+            EditorApplication.ExitPlaymode();
             //Application.Quit();
         }
     }
@@ -51,7 +52,7 @@ public class Spider : MonoBehaviour
 
         Rigidbody rb = web.GetComponent<Rigidbody>();
 
-        rb.linearVelocity = CalculateLaunchVelocity(webSpawn.position, target.position * 2.0f, 1.0f);
+        rb.linearVelocity = CalculateLaunchVelocity(webSpawn.position, target.position, 1.0f);
 
         animSpider.SetBool("isShooting", false);
         Destroy(web, 5.0f);

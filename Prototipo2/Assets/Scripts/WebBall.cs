@@ -1,3 +1,4 @@
+using UnityEditor;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -9,7 +10,8 @@ public class WebBall : MonoBehaviour
         {
             Debug.Log("Collisioned");
             Destroy(collision.transform.gameObject);
-            SceneManager.LoadScene("Level1");
+            EditorApplication.ExitPlaymode();
+            //SceneManager.LoadScene("Level1");
         }
     }
 }
