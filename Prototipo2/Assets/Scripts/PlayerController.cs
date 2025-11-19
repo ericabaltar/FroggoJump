@@ -114,9 +114,10 @@ public class PlayerController : MonoBehaviour
 
         float startYaw = transform.localEulerAngles.y;
 
-        while (elapsedTime < currentMoveDuration)
+        float moveDuration = currentMoveDuration;
+        while (elapsedTime < moveDuration)
         {
-            float percent = elapsedTime / currentMoveDuration;
+            float percent = elapsedTime / moveDuration;
 
             Vector3 newPos = Vector3.Lerp(startPos, endPos, percent);
             float arc = 0.5f;
