@@ -28,6 +28,9 @@ public class PowerUp : MonoBehaviour
     [Header("Vidas")]
     public int extraLives = 1;
 
+    [Header("Rango")]
+    public float upgradedRadius = 1f;
+
     private void Reset()
     {
         var col = GetComponent<Collider>();
@@ -43,7 +46,7 @@ public class PowerUp : MonoBehaviour
         switch (type)
         {
             case PowerUpType.MoreRange:
-
+                GameManager.Instance?.ActivateUpgradedRange(duration);
                 break;
             case PowerUpType.FastSpeed:
                 player.ApplySpeedMultiplier(duration, Mathf.Max(0.05f, speedMultiplier));

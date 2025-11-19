@@ -87,6 +87,8 @@ public class GameManager : MonoBehaviour
     // Camino serpenteante garantizado
     private int currentPathX;
 
+    bool upgradedRange = false;
+
     // (Opcional) multiplicador de score si lo usas
     private float scoreMultiplier = 1f;
     private Coroutine scoreMultiplierCoro;
@@ -322,7 +324,7 @@ public class GameManager : MonoBehaviour
 
         if (col is SphereCollider sc)
         {
-            if (sc.radius < 0.05f) sc.radius = Mathf.Max(0.3f, fly.pickupRadius);
+            if (sc.radius < 0.05f) sc.radius = Mathf.Max(0.3f, fly.regularPickupRadius);
             sc.center = Vector3.zero;
         }
 
@@ -354,7 +356,7 @@ public class GameManager : MonoBehaviour
 
             if (col is SphereCollider sc)
             {
-                if (sc.radius < 0.05f) sc.radius = Mathf.Max(0.3f, fly.pickupRadius);
+                if (sc.radius < 0.05f) sc.radius = Mathf.Max(0.3f, fly.regularPickupRadius);
                 sc.center = Vector3.zero;
             }
 
@@ -417,6 +419,28 @@ public class GameManager : MonoBehaviour
         extraLives--;
         // TODO: actualizar HUD de vidas si procede
         return true;
+    }
+
+    public void ActivateUpgradedRange(float duration)
+    {
+        SetUpgradedRange(true);
+
+        GameObject[] flies = GameObject.FindGameObjectsWithTag("Fly");
+
+        foreach (GameObject fly in flies)
+        {
+            fly.GetComponent<Fly>()?.SetPickupRange();
+        }
+    }
+
+    public bool GetUpgradedRange()
+    {
+        return upgradedRange;
+    }
+
+    void SetUpgradedRange(bool active)
+    {
+        upgradedRange = active;
     }
 
     // (Opcional) multiplicador de score si lo usas

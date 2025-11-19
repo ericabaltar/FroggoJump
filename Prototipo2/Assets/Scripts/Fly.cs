@@ -3,13 +3,15 @@ using UnityEngine;
 [RequireComponent(typeof(Collider))]
 public class Fly : MonoBehaviour
 {
+    [SerializeField] private SphereCollider sphereCollider;
     [Header("Stamina")]
     [Tooltip("Cuánta stamina otorga esta mosca al comerse.")]
     public int staminaAmount = 3;
 
     [Header("Detección")]
     [Tooltip("Radio mínimo para poder 'comer' la mosca. Usa un SphereCollider como trigger con este radio.")]
-    public float pickupRadius = 0.8f;
+    public float regularPickupRadius = 0.2f;
+    public float upgradedPickupRadius = 1f;
 
     [Header("Animación")]
     public bool bob = true;
@@ -18,19 +20,9 @@ public class Fly : MonoBehaviour
 
     private Vector3 basePos;
 
-    private void Reset()
-    {
-        var col = GetComponent<Collider>();
-        col.isTrigger = true;
-        if (col is SphereCollider sc) sc.radius = pickupRadius;
-        gameObject.tag = "Fly";
-    }
-
     private void Awake()
     {
         basePos = transform.position;
-        var col = GetComponent<Collider>();
-        if (col is SphereCollider sc) sc.isTrigger = true;
     }
 
     private void Update()
@@ -48,5 +40,13 @@ public class Fly : MonoBehaviour
     public void SetBasePos(Vector3 newBasePos)
     {
         basePos = newBasePos;
+    }
+
+    public void SetPickupRange()
+    {
+        if (GameManager.Instance.GetUpgradedRange())
+            sphereCollider.radius = upgradedPickupRadius;
+        else
+            sphereCollider.radius = regularPickupRadius;
     }
 }
