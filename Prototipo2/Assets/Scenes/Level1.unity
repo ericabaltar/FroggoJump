@@ -2243,7 +2243,7 @@ MonoBehaviour:
   flyPrefab: {fileID: 4130552063417685757, guid: a029c049900abf1488a489f34cf4f3cf, type: 3}
   fliesPerRowMin: 0
   fliesPerRowMax: 2
-  flySpawnChance: 0.5
+  flySpawnChance: 0.836
   flyYOffset: 0.4
   flyOnBaseChance: 0.5
   flyOnBaseLocalOffset: {x: 4.64, y: 0.4, z: 1.29}
@@ -3219,27 +3219,6 @@ GameObject:
   m_CorrespondingSourceObject: {fileID: 1444917237296251579, guid: 80047c07b84a33e4facaaac63b79e070, type: 3}
   m_PrefabInstance: {fileID: 5550510935513937666}
   m_PrefabAsset: {fileID: 0}
---- !u!114 &1318235008
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1318235004}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e8070d15d47f0824b9899ec33f18847a, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  moveClips:
-  - {fileID: 8300000, guid: 9f8c7b30e404d674db8124bf76b24466, type: 3}
-  - {fileID: 8300000, guid: fe2eb1be24e935346a0a627d5655c6e1, type: 3}
-  - {fileID: 8300000, guid: 47dfaa18f4c9124418eef1d834968636, type: 3}
-  volume: 1
-  pitch: 1
-  pitchJitter: 0.06
-  noImmediateRepeat: 1
-  use2D: 1
 --- !u!1001 &1330423323
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -5425,13 +5404,42 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 2310984945622424242, guid: 80047c07b84a33e4facaaac63b79e070, type: 3}
+      propertyPath: flyPickupClip
+      value: 
+      objectReference: {fileID: 8300000, guid: 3db28e0e9ff2d8b45844b49605afca22, type: 3}
+    - target: {fileID: 2310984945622424242, guid: 80047c07b84a33e4facaaac63b79e070, type: 3}
+      propertyPath: flyPickupVolume
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 2310984945622424242, guid: 80047c07b84a33e4facaaac63b79e070, type: 3}
+      propertyPath: powerupPickupClip
+      value: 
+      objectReference: {fileID: 8300000, guid: e6f7bbd182153a04084f250b2ac98ce1, type: 3}
+    - target: {fileID: 2310984945622424242, guid: 80047c07b84a33e4facaaac63b79e070, type: 3}
+      propertyPath: powerupPickupVolume
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 2310984945622424242, guid: 80047c07b84a33e4facaaac63b79e070, type: 3}
+      propertyPath: moveClips.Array.size
+      value: 3
+      objectReference: {fileID: 0}
+    - target: {fileID: 2310984945622424242, guid: 80047c07b84a33e4facaaac63b79e070, type: 3}
+      propertyPath: 'moveClips.Array.data[0]'
+      value: 
+      objectReference: {fileID: 8300000, guid: 9f8c7b30e404d674db8124bf76b24466, type: 3}
+    - target: {fileID: 2310984945622424242, guid: 80047c07b84a33e4facaaac63b79e070, type: 3}
+      propertyPath: 'moveClips.Array.data[1]'
+      value: 
+      objectReference: {fileID: 8300000, guid: fe2eb1be24e935346a0a627d5655c6e1, type: 3}
+    - target: {fileID: 2310984945622424242, guid: 80047c07b84a33e4facaaac63b79e070, type: 3}
+      propertyPath: 'moveClips.Array.data[2]'
+      value: 
+      objectReference: {fileID: 8300000, guid: 47dfaa18f4c9124418eef1d834968636, type: 3}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents:
-    - targetCorrespondingSourceObject: {fileID: 1444917237296251579, guid: 80047c07b84a33e4facaaac63b79e070, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 1318235008}
+    m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 80047c07b84a33e4facaaac63b79e070, type: 3}
 --- !u!1001 &5814979417940057495
 PrefabInstance:
