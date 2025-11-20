@@ -121,6 +121,10 @@ MonoBehaviour:
   pickupRadius: 0.6
   speedMultiplier: 1.5
   staminaDrainFactor: 0.5
+  commonPickupClip: {fileID: 8300000, guid: e6f7bbd182153a04084f250b2ac98ce1, type: 3}
+  pickupVolume: 1
+  pickupPitchJitter: 0.06
+  pickupBasePitch: 1
 --- !u!95 &2671599436342977824
 Animator:
   serializedVersion: 7

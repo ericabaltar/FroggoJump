@@ -14,6 +14,10 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private float inputBufferTime = 0.15f;
     [SerializeField] private float holdTime = 0.5f;
 
+    // --- NUEVO: sonidos de movimiento ---
+    [Header("SFX")]
+    [SerializeField] private MovementSFX movementSFX;
+
     private enum InputType { Tap, Hold }
 
     private Vector2Int bufferedInputDirection;
@@ -64,8 +68,8 @@ public class PlayerController : MonoBehaviour
         if (HudManager.Instance != null)
             HudManager.Instance.SetStaminaBar((float)currentStamina / maxStamina);
 
-        if (animator != null)
-            animator.SetFloat("JumpSpeedMult", 1f);
+        // Intento de auto-referenciar el componente SFX si no se asignó en el Inspector
+        if (movementSFX == null) movementSFX = GetComponent<MovementSFX>();
     }
 
     void Update()
@@ -85,6 +89,10 @@ public class PlayerController : MonoBehaviour
             if (GameManager.Instance.CheckIfAccessible(destination))
             {
                 if (animator) animator.SetTrigger("JumpTrigger");
+
+                //reproducir SFX de movimiento al iniciar el salto ---
+                if (movementSFX != null) movementSFX.PlayMove();
+
                 StartCoroutine(MoveCharacter(destination));
             }
         }
@@ -241,9 +249,6 @@ public class PlayerController : MonoBehaviour
         // Si tienes una vida extra, cancela la muerte
         if (GameManager.Instance != null && GameManager.Instance.TryConsumeExtraLife())
         {
-            // Apaga icono de vida extra en UI
-            PowerupUIManager.Instance?.OnExtraLifeConsumed();
-
             state = PlayerState.Ready;
             transform.SetParent(defaultParent, true);
             return;
@@ -282,7 +287,6 @@ public class PlayerController : MonoBehaviour
     private void OnDeathFocusComplete()
     {
         Debug.Log("Fin de transición de muerte.");
-        // Aquí decides: recargar escena, game over, etc.
     }
 
     void TurnCharacter(Vector2Int moveDirection)
@@ -296,7 +300,8 @@ public class PlayerController : MonoBehaviour
     private void SetStamina(int value)
     {
         currentStamina = Mathf.Clamp(value, 0, maxStamina);
-        HudManager.Instance?.SetStaminaBar((float)currentStamina / maxStamina);
+        if (HudManager.Instance != null)
+            HudManager.Instance.SetStaminaBar((float)currentStamina / maxStamina);
 
         if (currentStamina == 0)
             ChangeMovementSpeed(MovementSpeed.Slow);
@@ -311,15 +316,16 @@ public class PlayerController : MonoBehaviour
         if (newMovementSpeed == MovementSpeed.Slow)
         {
             currentMoveDuration = slowMoveDuration;
-            if (animator) animator.SetFloat("JumpSpeedMult", 0.2f);
+            animator.SetFloat("JumpSpeedMult", 0.2f);
         }
         else
         {
             currentMoveDuration = baseMoveDuration;
-            if (animator) animator.SetFloat("JumpSpeedMult", 1f);
+            animator.SetFloat("JumpSpeedMult", 1f);
         }
 
         currentMovementSpeed = newMovementSpeed;
+
     }
 
     private void DecreaseStamina(int baseCost)
@@ -395,33 +401,18 @@ public class PlayerController : MonoBehaviour
 
     private IEnumerator SpeedRoutine(float duration, float multiplier)
     {
-        // Notifica al HUD qué icono debe mostrarse
-        if (multiplier > 1f)
-            PowerupUIManager.Instance?.ActivateTimed(PowerupType.FastSpeed, duration);
-        else if (multiplier < 1f)
-            PowerupUIManager.Instance?.ActivateTimed(PowerupType.SlowSpeed, duration);
-
         speedMultiplier = multiplier;
         baseMoveDuration = originalBaseMoveDuration / speedMultiplier;
         currentMoveDuration = baseMoveDuration;
 
         yield return new WaitForSeconds(duration);
 
-        // Restaurar velocidad
         speedMultiplier = 1f;
         baseMoveDuration = originalBaseMoveDuration;
         currentMoveDuration = baseMoveDuration;
-
-        // Oscurecer icono al terminar
-        if (multiplier > 1f)
-            PowerupUIManager.Instance?.Deactivate(PowerupType.FastSpeed);
-        else if (multiplier < 1f)
-            PowerupUIManager.Instance?.Deactivate(PowerupType.SlowSpeed);
-
         speedCoro = null;
     }
 
-    // Reduce el gasto de estamina durante un tiempo. Factor entre 0.05 y 1.0 (1.0 = gasto normal)
     public void ApplyStaminaDrainModifier(float duration, float factor)
     {
         factor = Mathf.Clamp(factor, 0.05f, 1f);
@@ -431,16 +422,9 @@ public class PlayerController : MonoBehaviour
 
     private IEnumerator StaminaDrainRoutine(float duration, float factor)
     {
-        // HUD: activa icono de “gasto más lento”
-        PowerupUIManager.Instance?.ActivateTimed(PowerupType.StaminaSlow, duration);
-
         staminaDrainMultiplier = factor;
         yield return new WaitForSeconds(duration);
         staminaDrainMultiplier = 1f;
-
-        // Oscurecer icono al terminar
-        PowerupUIManager.Instance?.Deactivate(PowerupType.StaminaSlow);
-
         staminaCoro = null;
     }
 }
