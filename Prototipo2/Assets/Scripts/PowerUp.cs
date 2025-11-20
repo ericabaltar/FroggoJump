@@ -1,61 +1,79 @@
 using UnityEngine;
 
-public enum PowerUpType
+public enum PowerUpKind
 {
-    SlowSpeed,         // Reducir velocidad del jugador
-    FastSpeed,         // Aumentar velocidad del jugador
-    SlowStaminaDrain,  // La estamina se gasta más lento
-    ExtraLife          // Vida extra (uso único)
+    FastSpeed,     // Aumenta velocidad (duración)
+    SlowSpeed,     // Reduce velocidad (duración)
+    StaminaSlow,   // Estamina se gasta más lento (duración)
+    ExtraLife      // Vida extra (enciende icono hasta consumir)
 }
 
 [RequireComponent(typeof(Collider))]
 public class PowerUp : MonoBehaviour
 {
     [Header("Tipo")]
-    public PowerUpType type = PowerUpType.FastSpeed;
+    public PowerUpKind kind = PowerUpKind.ExtraLife;
 
-    [Header("Duración (si aplica)")]
-    public float duration = 6f;
+    [Header("Parámetros comunes")]
+    [SerializeField] private float durationSeconds = 6f;   // para temporales
+    [SerializeField] private float pickupRadius = 0.6f;    // si no hay collider, se crea Sphere
 
-    [Header("Parámetros de velocidad")]
-    [Tooltip("Multiplicador de velocidad (>1 más rápido, <1 más lento). Se usa en Fast/Slow Speed")]
-    public float speedMultiplier = 1.5f;   // FastSpeed: 1.5, SlowSpeed: 0.6 por ejemplo
+    [Header("Velocidad")]
+    [SerializeField] private float speedMultiplier = 1.5f; // >1 acelera, <1 frena
 
-    [Header("Parámetros de estamina")]
-    [Tooltip("Multiplicador del gasto de estamina (<1 gasta menos). Ej: 0.5 = gasta la mitad")]
-    public float staminaDrainMultiplier = 0.5f;
+    [Header("Estamina")]
+    [SerializeField, Range(0.05f, 1f)] private float staminaDrainFactor = 0.5f; // 0.5 = gasta la mitad
 
-    [Header("Vidas")]
-    public int extraLives = 1;
-
-    private void Reset()
+    private void Awake()
     {
+        // Asegura collider + trigger
         var col = GetComponent<Collider>();
+        if (col == null) col = gameObject.AddComponent<SphereCollider>();
         col.isTrigger = true;
-        if (gameObject.tag == "Untagged") gameObject.tag = "PowerUp";
+
+        if (col is SphereCollider sc)
+        {
+            if (sc.radius < 0.05f) sc.radius = pickupRadius;
+            sc.center = Vector3.zero;
+        }
+
+        // Tag opcional (no imprescindible)
+        if (CompareTag("Untagged")) gameObject.tag = "PowerUp";
     }
 
     private void OnTriggerEnter(Collider other)
     {
+        // Intenta encontrar PlayerController en el propio objeto o en sus padres
         var player = other.GetComponent<PlayerController>();
+        if (player == null)
+            player = other.GetComponentInParent<PlayerController>();
         if (player == null) return;
 
-        switch (type)
+        switch (kind)
         {
-            case PowerUpType.SlowSpeed:
-            case PowerUpType.FastSpeed:
-                player.ApplySpeedMultiplier(duration, Mathf.Max(0.05f, speedMultiplier));
+            case PowerUpKind.FastSpeed:
+                // El PlayerController ya enciende el icono al aplicar velocidad
+                player.ApplySpeedMultiplier(durationSeconds, speedMultiplier);
                 break;
 
-            case PowerUpType.SlowStaminaDrain:
-                player.ApplyStaminaDrainModifier(duration, Mathf.Clamp(staminaDrainMultiplier, 0.05f, 1f));
+            case PowerUpKind.SlowSpeed:
+                player.ApplySpeedMultiplier(durationSeconds, Mathf.Max(0.05f, speedMultiplier < 1f ? speedMultiplier : 0.5f));
                 break;
 
-            case PowerUpType.ExtraLife:
-                GameManager.Instance?.GrantExtraLife(extraLives);
+            case PowerUpKind.StaminaSlow:
+                // El PlayerController ya enciende el icono al aplicar stamina lenta
+                player.ApplyStaminaDrainModifier(durationSeconds, staminaDrainFactor);
+                break;
+
+            case PowerUpKind.ExtraLife:
+                // Aquí sí encendemos el icono desde el Manager
+                if (GameManager.Instance != null)
+                    GameManager.Instance.GrantExtraLife(1);
+                PowerupUIManager.Instance?.OnExtraLifeGained();
                 break;
         }
 
+        // Destruye el pickup tras aplicarse
         Destroy(gameObject);
     }
 }

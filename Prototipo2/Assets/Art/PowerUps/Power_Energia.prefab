@@ -116,11 +116,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1a51adc2eca719c40aafafde0cc41a5c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  type: 1
-  duration: 6
+  kind: 0
+  durationSeconds: 6
+  pickupRadius: 0.6
   speedMultiplier: 1.5
-  staminaDrainMultiplier: 0.5
-  extraLives: 1
+  staminaDrainFactor: 0.5
 --- !u!95 &2683242850648004449
 Animator:
   serializedVersion: 7
