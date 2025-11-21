@@ -304,7 +304,6 @@ public class PlayerController : MonoBehaviour
 
         if (lastSafeLocationBase != null)
         {
-            Debug.Log("Intentando subirse a " + lastSafeLocationBase.gameObject.name);
             GetOnMovingPlatform(lastSafeLocationBase);
         }
         else
@@ -398,7 +397,6 @@ public class PlayerController : MonoBehaviour
     {
         isOnMovingBase = true;
         currentMovingBase = movingBase;
-        Debug.Log("Moving base: " + movingBase.name);
         transform.SetParent(currentMovingBase.transform, true);
         transform.position = currentMovingBase.transform.position;
     }
