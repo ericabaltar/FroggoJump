@@ -410,8 +410,7 @@ public class GameManager : MonoBehaviour
     // ---------- Vidas ----------
     public void GrantExtraLife(int count = 1)
     {
-        extraLives += Mathf.Max(1, count);
-        // TODO: actualizar HUD de vidas si procede
+        extraLives = Mathf.Max(1, count);
     }
 
     public bool TryConsumeExtraLife()
