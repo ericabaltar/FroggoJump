@@ -2200,17 +2200,17 @@ MonoBehaviour:
   movingRowChance: 0.45
   movingBaseSpeedMin: 2
   movingBaseSpeedMax: 3.5
-  slowSpeedPrefab: {fileID: 3744794552715582423, guid: 73e7b5619dbef9a4283fb8322041477a, type: 3}
+  moreRangePrefab: {fileID: 69481119885283367, guid: ffd620b3ccbd3014da19a7f57ae90a1f, type: 3}
   slowSpeedDropChance: 0.021
   fastSpeedPrefab: {fileID: 7824628911248561787, guid: adbae6b11f36645439d53aa7a51d3c00, type: 3}
   fastSpeedDropChance: 0.028
-  slowStaminaPrefab: {fileID: 69481119885283367, guid: ffd620b3ccbd3014da19a7f57ae90a1f, type: 3}
+  staminaRegenPrefab: {fileID: 3744794552715582423, guid: 73e7b5619dbef9a4283fb8322041477a, type: 3}
   slowStaminaDropChance: 0.048
   extraLifePrefab: {fileID: 8394962195494274539, guid: 6beb95b1d424d7a46bddd262c89204c7, type: 3}
   extraLifeDropChance: 0.048
   powerupSocketName: PowerupSocket
   powerupExtraOffsetY: 0
-  powerupLocalOffset: {x: 0, y: 0.4, z: 0}
+  powerupLocalOffset: {x: 0, y: 0.75, z: 0}
   flyPrefab: {fileID: 4130552063417685757, guid: a029c049900abf1488a489f34cf4f3cf, type: 3}
   fliesPerRowMin: 0
   fliesPerRowMax: 2
@@ -4467,14 +4467,6 @@ PrefabInstance:
     - target: {fileID: 2214329307779361778, guid: 8d5b3800fb4d3ca41b074ce89f5da462, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 3062391006281967141, guid: 8d5b3800fb4d3ca41b074ce89f5da462, type: 3}
-      propertyPath: m_AnchoredPosition.x
-      value: -203
-      objectReference: {fileID: 0}
-    - target: {fileID: 3062391006281967141, guid: 8d5b3800fb4d3ca41b074ce89f5da462, type: 3}
-      propertyPath: m_AnchoredPosition.y
-      value: -70
       objectReference: {fileID: 0}
     - target: {fileID: 7329199718231748005, guid: 8d5b3800fb4d3ca41b074ce89f5da462, type: 3}
       propertyPath: m_Name

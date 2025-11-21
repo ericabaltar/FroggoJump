@@ -38,13 +38,13 @@ public class GameManager : MonoBehaviour
 
     // ---------- POWERUPS ----------
     [Header("PowerUps")]
-    [SerializeField] private PowerUp slowSpeedPrefab;        // Reducir velocidad
+    [SerializeField] private PowerUp moreRangePrefab;        // Reducir velocidad
     [Range(0f, 1f)][SerializeField] private float slowSpeedDropChance = 0.10f;
 
     [SerializeField] private PowerUp fastSpeedPrefab;        // Aumentar velocidad
     [Range(0f, 1f)][SerializeField] private float fastSpeedDropChance = 0.16f;
 
-    [SerializeField] private PowerUp slowStaminaPrefab;      // Estamina se gasta más lento
+    [SerializeField] private PowerUp staminaRegenPrefab;     // Estamina se regenera automáticamente
     [Range(0f, 1f)][SerializeField] private float slowStaminaDropChance = 0.12f;
 
     [SerializeField] private PowerUp extraLifePrefab;        // Vida extra
@@ -257,9 +257,9 @@ public class GameManager : MonoBehaviour
         if (baseTransform == null) return;
 
         var candidates = new List<(PowerUp prefab, float chance)>(4);
-        if (slowSpeedPrefab != null && slowSpeedDropChance > 0f) candidates.Add((slowSpeedPrefab, slowSpeedDropChance));
+        if (moreRangePrefab != null && slowSpeedDropChance > 0f) candidates.Add((moreRangePrefab, slowSpeedDropChance));
         if (fastSpeedPrefab != null && fastSpeedDropChance > 0f) candidates.Add((fastSpeedPrefab, fastSpeedDropChance));
-        if (slowStaminaPrefab != null && slowStaminaDropChance > 0f) candidates.Add((slowStaminaPrefab, slowStaminaDropChance));
+        if (staminaRegenPrefab != null && slowStaminaDropChance > 0f) candidates.Add((staminaRegenPrefab, slowStaminaDropChance));
         if (extraLifePrefab != null && extraLifeDropChance > 0f) candidates.Add((extraLifePrefab, extraLifeDropChance));
         if (candidates.Count == 0) return;
 
