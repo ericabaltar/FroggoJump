@@ -34,6 +34,7 @@ public class PowerupIconUI : MonoBehaviour
         if (startHidden) gameObject.SetActive(false);
         else ForceInactiveNow();
         iconImage.enabled = false;
+        darkMaskImage.enabled = false;
     }
 
     private void EnsureSetup()
