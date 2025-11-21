@@ -37,6 +37,7 @@ public class PowerupUIManager : MonoBehaviour
 
     public void ActivateTimed(PowerUpType type, float durationSeconds)
     {
+        Debug.Log("Activandose");
         switch (type)
         {
             case PowerUpType.MoreRange:
@@ -53,10 +54,6 @@ public class PowerupUIManager : MonoBehaviour
                 staminaRegenIcon?.ShowOff();
                 staminaRegenIcon?.PlayTimer(durationSeconds);
                 break;
-
-            case PowerUpType.ExtraLife:
-                extraLifeIcon?.ShowFullyLit(); 
-                break;
         }
     }
 
@@ -71,6 +68,11 @@ public class PowerupUIManager : MonoBehaviour
         }
     }
 
-    public void OnExtraLifeGained() => extraLifeIcon?.ShowFullyLit();
+    public void OnExtraLifeGained()
+    {
+        extraLifeIcon?.ShowFullyLit();
+
+    }
+
     public void OnExtraLifeConsumed() => extraLifeIcon?.HideCompletely();
 }

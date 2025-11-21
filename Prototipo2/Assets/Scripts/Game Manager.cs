@@ -417,7 +417,7 @@ public class GameManager : MonoBehaviour
     {
         if (extraLives <= 0) return false;
         extraLives--;
-        // TODO: actualizar HUD de vidas si procede
+        PowerupUIManager.Instance?.OnExtraLifeConsumed();
         return true;
     }
 
