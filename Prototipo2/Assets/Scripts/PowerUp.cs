@@ -53,7 +53,7 @@ public class PowerUp : MonoBehaviour
                 break;
 
             case PowerUpType.StaminaRegen:
-                player.ApplyStaminaRegeneration(1, 0.5f, duration);
+                player.ApplyStaminaRegeneration(staminaRegenPerInterval, regenInterval, duration);
                 break;
 
             case PowerUpType.ExtraLife:

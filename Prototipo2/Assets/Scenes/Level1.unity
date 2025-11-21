@@ -2203,7 +2203,7 @@ MonoBehaviour:
   moreRangePrefab: {fileID: 69481119885283367, guid: ffd620b3ccbd3014da19a7f57ae90a1f, type: 3}
   slowSpeedDropChance: 0.021
   fastSpeedPrefab: {fileID: 7824628911248561787, guid: adbae6b11f36645439d53aa7a51d3c00, type: 3}
-  fastSpeedDropChance: 0.028
+  fastSpeedDropChance: 0.251
   staminaRegenPrefab: {fileID: 3744794552715582423, guid: 73e7b5619dbef9a4283fb8322041477a, type: 3}
   slowStaminaDropChance: 0.048
   extraLifePrefab: {fileID: 8394962195494274539, guid: 6beb95b1d424d7a46bddd262c89204c7, type: 3}

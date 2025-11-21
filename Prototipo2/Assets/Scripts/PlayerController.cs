@@ -50,6 +50,8 @@ public class PlayerController : MonoBehaviour
     private float staminaResidue = 0f; // acumula gasto fraccional
     private Coroutine staminaCoro;
 
+    bool canDie = true;
+
     void Start()
     {
         pos = new Vector2Int(0, 0);
@@ -139,7 +141,7 @@ public class PlayerController : MonoBehaviour
 
         // Muerte en road si NO hay base estática y NO hay base móvil
         bool isRoadRow = GameManager.Instance.IsRoadRow(destination.y);
-        if (isRoadRow && !GameManager.Instance.HasBaseAt(pos) && !isOnMovingBase)
+        if (canDie && isRoadRow && !GameManager.Instance.HasBaseAt(pos) && !isOnMovingBase)
         {
             Die();
             yield break;
@@ -389,6 +391,8 @@ public class PlayerController : MonoBehaviour
     // multiplier > 1 acelera; multiplier < 1 desacelera
     public void ApplySpeedMultiplier(float duration, float multiplier)
     {
+        canDie = false;
+
         if (speedCoro != null) StopCoroutine(speedCoro);
         speedCoro = StartCoroutine(SpeedRoutine(duration, Mathf.Max(0.05f, multiplier)));
     }
@@ -398,12 +402,17 @@ public class PlayerController : MonoBehaviour
         speedMultiplier = multiplier;
         baseMoveDuration = originalBaseMoveDuration / speedMultiplier;
         currentMoveDuration = baseMoveDuration;
+        float originalInputBufferTime = inputBufferTime;
+        inputBufferTime = baseMoveDuration - 0.05f;
 
         yield return new WaitForSeconds(duration);
+
+        canDie = true;
 
         speedMultiplier = 1f;
         baseMoveDuration = originalBaseMoveDuration;
         currentMoveDuration = baseMoveDuration;
+        inputBufferTime = originalInputBufferTime;
         speedCoro = null;
     }
 
