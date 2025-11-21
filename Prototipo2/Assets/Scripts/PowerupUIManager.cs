@@ -68,11 +68,6 @@ public class PowerupUIManager : MonoBehaviour
         }
     }
 
-    public void OnExtraLifeGained()
-    {
-        extraLifeIcon?.ShowFullyLit();
-
-    }
-
+    public void OnExtraLifeGained() => extraLifeIcon?.ShowFullyLit();
     public void OnExtraLifeConsumed() => extraLifeIcon?.HideCompletely();
 }

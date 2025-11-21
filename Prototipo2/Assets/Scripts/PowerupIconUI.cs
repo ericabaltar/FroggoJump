@@ -33,6 +33,7 @@ public class PowerupIconUI : MonoBehaviour
         EnsureSetup();
         if (startHidden) gameObject.SetActive(false);
         else ForceInactiveNow();
+        iconImage.enabled = false;
     }
 
     private void EnsureSetup()

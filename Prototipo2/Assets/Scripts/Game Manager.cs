@@ -82,6 +82,7 @@ public class GameManager : MonoBehaviour
 
     private int spawnLocation;
     private int currentFarthestDistance = 0;
+
     public static GameManager Instance { get; private set; }
 
     // Camino serpenteante garantizado
