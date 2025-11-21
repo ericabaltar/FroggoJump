@@ -97,7 +97,6 @@ public class PlayerController : MonoBehaviour
 
             if (GameManager.Instance.CheckIfAccessible(destination))
             {
-                // Dispara evento de inicio de salto (MovementSFX debe suscribirse)
                 OnJumpStart?.Invoke();
 
                 if (animator) animator.SetTrigger("JumpTrigger");
@@ -163,7 +162,6 @@ public class PlayerController : MonoBehaviour
         {
             state = PlayerState.Ready;
 
-            // Dispara evento de aterrizaje (MovementSFX debe suscribirse)
             OnLanded?.Invoke();
 
             if (isOnMovingBase && currentMovingBase != null)
@@ -286,7 +284,23 @@ public class PlayerController : MonoBehaviour
 
     private void OnDeathFocusComplete()
     {
-        Debug.Log("Fin de transición de muerte.");
+        // Score final (usa el que tengas disponible)
+        int finalScore = 0;
+        if (GameManager.Instance != null)
+        {
+            // Si tienes un método de score mostrado, úsalo; si no, la distancia:
+            finalScore = GameManager.Instance.GetFarthestDistance();
+        }
+
+        // Muestra la UI de Game Over (pausa se hace dentro del manager)
+        if (GameOverUIManager.Instance != null)
+        {
+            GameOverUIManager.Instance.Show(finalScore);
+        }
+        else
+        {
+            Debug.LogWarning("GameOverUIManager no encontrado en la escena.");
+        }
     }
 
     void TurnCharacter(Vector2Int moveDirection)
