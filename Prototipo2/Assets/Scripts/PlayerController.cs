@@ -28,6 +28,14 @@ public class PlayerController : MonoBehaviour
     [SerializeField, Range(0f, 0.3f)] private float flyPickupPitchJitter = 0.03f;
     [SerializeField] private float flyPickupBasePitch = 1f;
 
+    // -------- SFX LongJump (feedback) --------
+    [Header("SFX LongJump (al cargar el salto largo)")]
+    [SerializeField] private AudioClip longJumpReadyClip;
+    [SerializeField, Range(0f, 1f)] private float longJumpReadyVolume = 0.9f;
+    [SerializeField, Range(0f, 0.3f)] private float longJumpReadyPitchJitter = 0.03f;
+    [SerializeField] private float longJumpReadyBasePitch = 1f;
+    bool alreadyPlayedLongJumpSoundEffect = false;
+
     // -------- Señales de movimiento para MovementSFX --------
     public event System.Action OnJumpStart;
     public event System.Action OnLanded;
@@ -247,12 +255,20 @@ public class PlayerController : MonoBehaviour
             }
             else
             {
+                if (!alreadyPlayedLongJumpSoundEffect)
+                {
+                    PlayLongJumpSfx();
+                    alreadyPlayedLongJumpSoundEffect = true;
+                }
+
                 float vibrate = 0.825f + 0.025f * Mathf.Sin(Time.time * 20f);
                 transform.localScale = new Vector3(1f, vibrate, 1f);
             }
 
             if (key.wasReleasedThisFrame || key2.wasReleasedThisFrame)
             {
+                alreadyPlayedLongJumpSoundEffect = false;
+
                 inputHeldTimes.Clear();
 
                 transform.localScale = Vector3.one;
@@ -457,6 +473,22 @@ public class PlayerController : MonoBehaviour
 
         var pos = Camera.main ? Camera.main.transform.position : transform.position;
         AudioSource.PlayClipAtPoint(flyPickupClip, pos, flyPickupVolume);
+    }
+
+    private void PlayLongJumpSfx()
+    {
+        if (longJumpReadyClip == null) return;
+
+        float pitch = Mathf.Clamp(longJumpReadyBasePitch + Random.Range(-longJumpReadyPitchJitter, longJumpReadyBasePitch), 0.1f, 3f);
+
+        if (SfxManager.Instance != null)
+        {
+            SfxManager.Instance.PlayOneShot(longJumpReadyClip, longJumpReadyVolume, longJumpReadyPitchJitter, longJumpReadyBasePitch);
+            return;
+        }
+
+        var pos = Camera.main ? Camera.main.transform.position : transform.position;
+        AudioSource.PlayClipAtPoint(longJumpReadyClip, pos, longJumpReadyVolume);
     }
 
     private void OnTriggerExit(Collider other)

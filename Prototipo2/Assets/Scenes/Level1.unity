@@ -5991,7 +5991,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6984993214457840684, guid: 8d5b3800fb4d3ca41b074ce89f5da462, type: 3}
       propertyPath: m_AnchoredPosition.y
-      value: 10.0000305
+      value: 10
       objectReference: {fileID: 0}
     - target: {fileID: 7329199718231748005, guid: 8d5b3800fb4d3ca41b074ce89f5da462, type: 3}
       propertyPath: m_Name
@@ -6077,6 +6077,10 @@ PrefabInstance:
       propertyPath: flyPickupVolume
       value: 1
       objectReference: {fileID: 0}
+    - target: {fileID: 2310984945622424242, guid: 80047c07b84a33e4facaaac63b79e070, type: 3}
+      propertyPath: longJumpReadyClip
+      value: 
+      objectReference: {fileID: 8300000, guid: 00044ea8eb6f3d047881bbb11e24d2eb, type: 3}
     - target: {fileID: 2310984945622424242, guid: 80047c07b84a33e4facaaac63b79e070, type: 3}
       propertyPath: powerupPickupClip
       value: 
