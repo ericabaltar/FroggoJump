@@ -73,6 +73,7 @@ public class PowerUp : MonoBehaviour
                 break;
             case PowerUpType.StaminaRegen:
                 player.ApplyStaminaRegeneration(staminaRegenPerInterval, regenInterval, durationSeconds);
+                PowerupUIManager.Instance?.ActivateTimed(PowerUpType.StaminaRegen, durationSeconds);
                 break;
             case PowerUpType.ExtraLife:
                 GameManager.Instance?.GrantExtraLife(1);
@@ -82,47 +83,5 @@ public class PowerUp : MonoBehaviour
 
         // Destruye el pickup tras aplicarse
         Destroy(gameObject);
-    }
-
-    private void PlayPickupSfx()
-    {
-        if (commonPickupClip == null)
-        {
-            Debug.LogWarning($"[PowerUp] No hay commonPickupClip asignado en {name}. No se puede reproducir sonido.");
-            return;
-        }
-
-        // 1) Usa SfxManager si existe
-        if (SfxManager.Instance != null)
-        {
-            SfxManager.Instance.PlayOneShot(commonPickupClip, pickupVolume, pickupPitchJitter, pickupBasePitch);
-            // Debug opcional:
-            // Debug.Log("[PowerUp] SFX por SfxManager");
-            return;
-        }
-
-        // 2) Fallback local: crea un AudioSource temporal en escena
-        // (Esto asegura sonido aunque te hayas olvidado del manager)
-        var go = new GameObject("OneShot_SFX_PowerUp");
-        var src = go.AddComponent<AudioSource>();
-        src.playOnAwake = false;
-        src.loop = false;
-        src.spatialBlend = 0f; // 2D
-        src.volume = Mathf.Clamp01(pickupVolume);
-
-        // Pitch aleatorio:
-        float p = Mathf.Clamp(pickupBasePitch + Random.Range(-pickupPitchJitter, pickupPitchJitter), 0.1f, 3f);
-        src.pitch = p;
-
-        src.clip = commonPickupClip;
-        src.Play();
-
-        // Col�cala cerca de la c�mara por si tu listener est� all�
-        var cam = Camera.main;
-        go.transform.position = cam ? cam.transform.position : Vector3.zero;
-
-        Object.Destroy(go, commonPickupClip.length / Mathf.Max(0.01f, p));
-        // Debug opcional:
-        // Debug.Log("[PowerUp] SFX por fallback local (sin SfxManager)");
     }
 }

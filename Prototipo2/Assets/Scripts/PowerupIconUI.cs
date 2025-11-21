@@ -59,22 +59,22 @@ public class PowerupIconUI : MonoBehaviour
     public void HideCompletely()
     {
         if (timerCoro != null) { StopCoroutine(timerCoro); timerCoro = null; }
-        gameObject.SetActive(false);
+        iconImage.enabled = false;
     }
 
     /// Muestra el icono, en estado APAGADO (oscuro total + tinte gris)
     public void ShowOff()
     {
-        gameObject.SetActive(true);
+        iconImage.enabled = true;
         ForceInactiveNow();
     }
 
     /// Enciende al 100% (icono visible sin máscara)
     public void ShowFullyLit()
     {
-        if (!gameObject.activeSelf) gameObject.SetActive(true);
         if (timerCoro != null) { StopCoroutine(timerCoro); timerCoro = null; }
         EnsureSetup();
+        iconImage.enabled = true;
         if (darkMaskImage != null) { darkMaskImage.enabled = true; darkMaskImage.fillAmount = 0f; }
         if (iconImage != null) iconImage.color = activeIconTint;
     }
@@ -109,10 +109,10 @@ public class PowerupIconUI : MonoBehaviour
         darkMaskImage.fillAmount = 1f;
         iconImage.color = inactiveIconTint;
 
-        float t = 0f;
-        while (t < duration)
+        float t = duration;
+        while (t > 0)
         {
-            t += unscaledTime ? Time.unscaledDeltaTime : Time.deltaTime;
+            t -= unscaledTime ? Time.unscaledDeltaTime : Time.deltaTime;
             float k = Mathf.Clamp01(t / duration);
 
             darkMaskImage.fillAmount = 1f - k;

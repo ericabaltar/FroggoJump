@@ -67,12 +67,16 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1a51adc2eca719c40aafafde0cc41a5c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  type: 0
-  duration: 20
+  type: 1
+  durationSeconds: 6
+  pickupRadius: 0.6
   speedMultiplier: 1.5
   staminaRegenPerInterval: 1
   regenInterval: 0.5
-  extraLives: 1
+  commonPickupClip: {fileID: 0}
+  pickupVolume: 0.9
+  pickupPitchJitter: 0.06
+  pickupBasePitch: 1
   upgradedRadius: 1
 --- !u!1001 &5376257137763234846
 PrefabInstance:
