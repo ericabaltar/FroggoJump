@@ -188,6 +188,11 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: d05407ce895017041a50788f4ed37929, type: 3}
+--- !u!4 &35760407 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 6212547935882950730, guid: 80047c07b84a33e4facaaac63b79e070, type: 3}
+  m_PrefabInstance: {fileID: 5550510935513937666}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1001 &70637512
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -2428,7 +2433,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   character: {fileID: 401840995}
-  characterModel: {fileID: 0}
+  characterModel: {fileID: 35760407}
   terrainHolder: {fileID: 494278131}
   grassPrefab: {fileID: 3859348135394012647, guid: 5479be6b53bcbef4c8efe89a3c97597c, type: 3}
   roadPrefab: {fileID: 6028958659787560634, guid: b63056cd4d3e630459159274891e6d2d, type: 3}
