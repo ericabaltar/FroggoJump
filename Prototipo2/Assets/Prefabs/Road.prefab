@@ -1680,8 +1680,8 @@ ParticleSystem:
       maxColor: {r: 1, g: 1, b: 1, a: 1}
       maxGradient:
         serializedVersion: 2
-        key0: {r: 0.6886792, g: 0.65571845, b: 0.055224285, a: 1}
-        key1: {r: 0.6698113, g: 0.64278156, b: 0.2748754, a: 1}
+        key0: {r: 1, g: 0.9444444, b: 0, a: 1}
+        key1: {r: 0.9433962, g: 0.88325536, b: 0.07564971, a: 1}
         key2: {r: 0, g: 0, b: 0, a: 0}
         key3: {r: 0, g: 0, b: 0, a: 0}
         key4: {r: 0, g: 0, b: 0, a: 0}
