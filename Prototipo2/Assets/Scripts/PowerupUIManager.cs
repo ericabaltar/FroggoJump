@@ -1,21 +1,19 @@
 ﻿using UnityEngine;
 
-public enum PowerupType { SlowSpeed, FastSpeed, StaminaSlow, ExtraLife }
-
 public class PowerupUIManager : MonoBehaviour
 {
     public static PowerupUIManager Instance { get; private set; }
 
     [Header("Iconos en HUD (arrástralos)")]
-    [SerializeField] private PowerupIconUI slowSpeedIcon;   // Rango.png
+    [SerializeField] private PowerupIconUI moreRangeIcon;   // Rango.png
     [SerializeField] private PowerupIconUI fastSpeedIcon;   // Velocidad.png
-    [SerializeField] private PowerupIconUI staminaIcon;     // Energia.png
+    [SerializeField] private PowerupIconUI staminaRegenIcon;     // Energia.png
     [SerializeField] private PowerupIconUI extraLifeIcon;   // Corazon.png
 
     [Header("Sprites (forzados en Awake)")]
-    [SerializeField] private Sprite slowSpeedSprite;   // Rango.png
+    [SerializeField] private Sprite moreRangeSprite;   // Rango.png
     [SerializeField] private Sprite fastSpeedSprite;   // Velocidad.png
-    [SerializeField] private Sprite staminaSprite;     // Energia.png
+    [SerializeField] private Sprite staminaRegenSprite;     // Energia.png
     [SerializeField] private Sprite extraLifeSprite;   // Corazon.png
 
     private void Awake()
@@ -25,51 +23,51 @@ public class PowerupUIManager : MonoBehaviour
         DontDestroyOnLoad(gameObject);
 
         // Fuerza sprites correctos (evita “arrastrar” el sprite equivocado desde prefabs)
-        slowSpeedIcon?.SetIconSprite(slowSpeedSprite);
+        moreRangeIcon?.SetIconSprite(moreRangeSprite);
         fastSpeedIcon?.SetIconSprite(fastSpeedSprite);
-        staminaIcon?.SetIconSprite(staminaSprite);
+        staminaRegenIcon?.SetIconSprite(staminaRegenSprite);
         extraLifeIcon?.SetIconSprite(extraLifeSprite);
 
         // Arrancan ocultos
-        slowSpeedIcon?.HideCompletely();
+        moreRangeIcon?.HideCompletely();
         fastSpeedIcon?.HideCompletely();
-        staminaIcon?.HideCompletely();
+        staminaRegenIcon?.HideCompletely();
         extraLifeIcon?.HideCompletely();
     }
 
-    public void ActivateTimed(PowerupType type, float durationSeconds)
+    public void ActivateTimed(PowerUpType type, float durationSeconds)
     {
         switch (type)
         {
-            case PowerupType.SlowSpeed:
-                slowSpeedIcon?.ShowOff();
-                slowSpeedIcon?.PlayTimer(durationSeconds);
+            case PowerUpType.MoreRange:
+                moreRangeIcon?.ShowOff();
+                moreRangeIcon?.PlayTimer(durationSeconds);
                 break;
 
-            case PowerupType.FastSpeed:
+            case PowerUpType.FastSpeed:
                 fastSpeedIcon?.ShowOff();
                 fastSpeedIcon?.PlayTimer(durationSeconds);
                 break;
 
-            case PowerupType.StaminaSlow:
-                staminaIcon?.ShowOff();
-                staminaIcon?.PlayTimer(durationSeconds);
+            case PowerUpType.StaminaRegen:
+                staminaRegenIcon?.ShowOff();
+                staminaRegenIcon?.PlayTimer(durationSeconds);
                 break;
 
-            case PowerupType.ExtraLife:
+            case PowerUpType.ExtraLife:
                 extraLifeIcon?.ShowFullyLit(); 
                 break;
         }
     }
 
-    public void Deactivate(PowerupType type)
+    public void Deactivate(PowerUpType type)
     {
         switch (type)
         {
-            case PowerupType.SlowSpeed: slowSpeedIcon?.HideCompletely(); break;
-            case PowerupType.FastSpeed: fastSpeedIcon?.HideCompletely(); break;
-            case PowerupType.StaminaSlow: staminaIcon?.HideCompletely(); break;
-            case PowerupType.ExtraLife: extraLifeIcon?.HideCompletely(); break;
+            case PowerUpType.MoreRange: moreRangeIcon?.HideCompletely(); break;
+            case PowerUpType.FastSpeed: fastSpeedIcon?.HideCompletely(); break;
+            case PowerUpType.StaminaRegen: staminaRegenIcon?.HideCompletely(); break;
+            case PowerUpType.ExtraLife: extraLifeIcon?.HideCompletely(); break;
         }
     }
 

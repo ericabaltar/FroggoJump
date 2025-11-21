@@ -38,13 +38,13 @@ public class GameManager : MonoBehaviour
 
     // ---------- POWERUPS ----------
     [Header("PowerUps")]
-    [SerializeField] private PowerUp slowSpeedPrefab;        // Reducir velocidad
+    [SerializeField] private PowerUp moreRangePrefab;        // Reducir velocidad
     [Range(0f, 1f)][SerializeField] private float slowSpeedDropChance = 0.10f;
 
     [SerializeField] private PowerUp fastSpeedPrefab;        // Aumentar velocidad
     [Range(0f, 1f)][SerializeField] private float fastSpeedDropChance = 0.16f;
 
-    [SerializeField] private PowerUp slowStaminaPrefab;      // Estamina se gasta más lento
+    [SerializeField] private PowerUp staminaRegenPrefab;     // Estamina se regenera automáticamente
     [Range(0f, 1f)][SerializeField] private float slowStaminaDropChance = 0.12f;
 
     [SerializeField] private PowerUp extraLifePrefab;        // Vida extra
@@ -86,6 +86,8 @@ public class GameManager : MonoBehaviour
 
     // Camino serpenteante garantizado
     private int currentPathX;
+
+    bool upgradedRange = false;
 
     // (Opcional) multiplicador de score si lo usas
     private float scoreMultiplier = 1f;
@@ -255,9 +257,9 @@ public class GameManager : MonoBehaviour
         if (baseTransform == null) return;
 
         var candidates = new List<(PowerUp prefab, float chance)>(4);
-        if (slowSpeedPrefab != null && slowSpeedDropChance > 0f) candidates.Add((slowSpeedPrefab, slowSpeedDropChance));
+        if (moreRangePrefab != null && slowSpeedDropChance > 0f) candidates.Add((moreRangePrefab, slowSpeedDropChance));
         if (fastSpeedPrefab != null && fastSpeedDropChance > 0f) candidates.Add((fastSpeedPrefab, fastSpeedDropChance));
-        if (slowStaminaPrefab != null && slowStaminaDropChance > 0f) candidates.Add((slowStaminaPrefab, slowStaminaDropChance));
+        if (staminaRegenPrefab != null && slowStaminaDropChance > 0f) candidates.Add((staminaRegenPrefab, slowStaminaDropChance));
         if (extraLifePrefab != null && extraLifeDropChance > 0f) candidates.Add((extraLifePrefab, extraLifeDropChance));
         if (candidates.Count == 0) return;
 
@@ -322,7 +324,7 @@ public class GameManager : MonoBehaviour
 
         if (col is SphereCollider sc)
         {
-            if (sc.radius < 0.05f) sc.radius = Mathf.Max(0.3f, fly.pickupRadius);
+            if (sc.radius < 0.05f) sc.radius = Mathf.Max(0.3f, fly.regularPickupRadius);
             sc.center = Vector3.zero;
         }
 
@@ -354,7 +356,7 @@ public class GameManager : MonoBehaviour
 
             if (col is SphereCollider sc)
             {
-                if (sc.radius < 0.05f) sc.radius = Mathf.Max(0.3f, fly.pickupRadius);
+                if (sc.radius < 0.05f) sc.radius = Mathf.Max(0.3f, fly.regularPickupRadius);
                 sc.center = Vector3.zero;
             }
 
@@ -417,6 +419,28 @@ public class GameManager : MonoBehaviour
         extraLives--;
         // TODO: actualizar HUD de vidas si procede
         return true;
+    }
+
+    public void ActivateUpgradedRange(float duration)
+    {
+        SetUpgradedRange(true);
+
+        GameObject[] flies = GameObject.FindGameObjectsWithTag("Fly");
+
+        foreach (GameObject fly in flies)
+        {
+            fly.GetComponent<Fly>()?.SetPickupRange();
+        }
+    }
+
+    public bool GetUpgradedRange()
+    {
+        return upgradedRange;
+    }
+
+    void SetUpgradedRange(bool active)
+    {
+        upgradedRange = active;
     }
 
     // (Opcional) multiplicador de score si lo usas

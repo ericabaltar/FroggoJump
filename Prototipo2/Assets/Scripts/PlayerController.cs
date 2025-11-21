@@ -67,6 +67,8 @@ public class PlayerController : MonoBehaviour
     private float staminaResidue = 0f;
     private Coroutine staminaCoro;
 
+    bool canDie = true;
+
     void Start()
     {
         pos = new Vector2Int(0, 0);
@@ -152,7 +154,7 @@ public class PlayerController : MonoBehaviour
         GameManager.Instance.UpdateFarthestDistance(destination.y);
 
         bool isRoadRow = GameManager.Instance.IsRoadRow(destination.y);
-        if (isRoadRow && !GameManager.Instance.HasBaseAt(pos) && !isOnMovingBase)
+        if (canDie && isRoadRow && !GameManager.Instance.HasBaseAt(pos) && !isOnMovingBase)
         {
             Die();
             yield break;
@@ -382,18 +384,6 @@ public class PlayerController : MonoBehaviour
             return;
         }
 
-        if (other.CompareTag("PowerUp") || other.GetComponent<PowerUp>() != null)
-        {
-            var pu = other.GetComponent<PowerUp>() ?? other.GetComponentInParent<PowerUp>();
-            if (pu != null)
-            {
-                ApplyPowerUp(pu);
-                PlayPowerupPickupSfx();
-                Destroy(pu.gameObject);
-            }
-            return;
-        }
-
         if (!isOnMovingBase && other.CompareTag("MovingBase"))
         {
             isOnMovingBase = true;
@@ -404,47 +394,8 @@ public class PlayerController : MonoBehaviour
         }
     }
 
-    // ================== APLICACIÓN POWERUPS DESDE PLAYER ==================
-    private void ApplyPowerUp(PowerUp pu)
-    {
-        switch (pu.kind)
-        {
-            case PowerUpKind.FastSpeed:
-                ApplySpeedMultiplier(GetPuDuration(pu), Mathf.Max(1.01f, GetPuSpeedMult(pu)));
-                PowerupUIManager.Instance?.ActivateTimed(PowerupType.FastSpeed, GetPuDuration(pu));
-                break;
-
-            case PowerUpKind.SlowSpeed:
-                {
-                    float mult = GetPuSpeedMult(pu) < 1f ? Mathf.Clamp(GetPuSpeedMult(pu), 0.05f, 0.99f) : 0.5f;
-                    ApplySpeedMultiplier(GetPuDuration(pu), mult);
-                    PowerupUIManager.Instance?.ActivateTimed(PowerupType.SlowSpeed, GetPuDuration(pu));
-                    break;
-                }
-
-            case PowerUpKind.StaminaSlow:
-                ApplyStaminaDrainModifier(GetPuDuration(pu), GetPuStaminaFactor(pu));
-                PowerupUIManager.Instance?.ActivateTimed(PowerupType.StaminaSlow, GetPuDuration(pu));
-                break;
-
-            case PowerUpKind.ExtraLife:
-                GameManager.Instance?.GrantExtraLife(1);
-                PowerupUIManager.Instance?.OnExtraLifeGained();
-                break;
-        }
-    }
-
-    private float GetPuDuration(PowerUp pu) =>
-        (float)pu.GetType().GetField("durationSeconds", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(pu);
-
-    private float GetPuSpeedMult(PowerUp pu) =>
-        (float)pu.GetType().GetField("speedMultiplier", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(pu);
-
-    private float GetPuStaminaFactor(PowerUp pu) =>
-        (float)pu.GetType().GetField("staminaDrainFactor", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(pu);
-
     // ================== SFX PICKUPS ==================
-    private void PlayPowerupPickupSfx()
+    public void PlayPowerupPickupSfx()
     {
         if (powerupPickupClip == null) return;
 
@@ -492,6 +443,8 @@ public class PlayerController : MonoBehaviour
     // ====== MÉTODOS POWERUPS ======
     public void ApplySpeedMultiplier(float duration, float multiplier)
     {
+        canDie = false;
+
         if (speedCoro != null) StopCoroutine(speedCoro);
         speedCoro = StartCoroutine(SpeedRoutine(duration, Mathf.Max(0.05f, multiplier)));
     }
@@ -501,27 +454,34 @@ public class PlayerController : MonoBehaviour
         speedMultiplier = multiplier;
         baseMoveDuration = originalBaseMoveDuration / speedMultiplier;
         currentMoveDuration = baseMoveDuration;
+        float originalInputBufferTime = inputBufferTime;
+        inputBufferTime = baseMoveDuration - 0.05f;
 
         yield return new WaitForSeconds(duration);
+
+        canDie = true;
 
         speedMultiplier = 1f;
         baseMoveDuration = originalBaseMoveDuration;
         currentMoveDuration = baseMoveDuration;
+        inputBufferTime = originalInputBufferTime;
         speedCoro = null;
     }
 
-    public void ApplyStaminaDrainModifier(float duration, float factor)
+    public void ApplyStaminaRegeneration(int amountPerTick, float interval, float duration)
     {
-        factor = Mathf.Clamp(factor, 0.05f, 1f);
-        if (staminaCoro != null) StopCoroutine(staminaCoro);
-        staminaCoro = StartCoroutine(StaminaDrainRoutine(duration, factor));
+        StartCoroutine(StaminaRegenRoutine(amountPerTick, interval, duration));
     }
 
-    private IEnumerator StaminaDrainRoutine(float duration, float factor)
+    private IEnumerator StaminaRegenRoutine(int amountPerTick, float interval, float duration)
     {
-        staminaDrainMultiplier = factor;
-        yield return new WaitForSeconds(duration);
-        staminaDrainMultiplier = 1f;
-        staminaCoro = null;
+        float elapsed = 0f;
+
+        while (elapsed < duration)
+        {
+            AddStamina(amountPerTick);
+            yield return new WaitForSeconds(interval);
+            elapsed += interval;
+        }
     }
 }

@@ -1,10 +1,10 @@
 using UnityEngine;
 
-public enum PowerUpKind
+public enum PowerUpType
 {
-    FastSpeed,     // Aumenta velocidad (duración)
-    SlowSpeed,     // Reduce velocidad (duración)
-    StaminaSlow,   // Estamina se gasta más lento (duración)
+    FastSpeed,     // Aumenta velocidad (duraciï¿½n)
+    MoreRange,     // Reduce velocidad (duraciï¿½n)
+    StaminaRegen,   // Estamina se gasta mï¿½s lento (duraciï¿½n)
     ExtraLife      // Vida extra (enciende icono hasta consumir)
 }
 
@@ -12,27 +12,31 @@ public enum PowerUpKind
 public class PowerUp : MonoBehaviour
 {
     [Header("Tipo")]
-    public PowerUpKind kind = PowerUpKind.ExtraLife;
+    public PowerUpType type = PowerUpType.ExtraLife;
 
-    [Header("Parámetros comunes")]
+    [Header("Parï¿½metros comunes")]
     [SerializeField] private float durationSeconds = 6f;   // para temporales
     [SerializeField] private float pickupRadius = 0.6f;    // si no hay collider, se crea Sphere
 
     [Header("Velocidad")]
     [SerializeField] private float speedMultiplier = 1.5f; // >1 acelera, <1 frena
 
-    [Header("Estamina")]
-    [SerializeField, Range(0.05f, 1f)] private float staminaDrainFactor = 0.5f; // 0.5 = gasta la mitad
+    [Header("Parï¿½metros de estamina")]
+    public int staminaRegenPerInterval = 1;
+    public float regenInterval = 0.5f;
 
-    // -------- SFX PICKUP (COMÚN) --------
-    [Header("SFX único para TODOS los powerups")]
-    [Tooltip("Mismo clip para todos los powerups. Arrástralo en cada prefab o configúralo por script.")]
+    // -------- SFX PICKUP (COMï¿½N) --------
+    [Header("SFX ï¿½nico para TODOS los powerups")]
+    [Tooltip("Mismo clip para todos los powerups. Arrï¿½stralo en cada prefab o configï¿½ralo por script.")]
     [SerializeField] private AudioClip commonPickupClip;
     [SerializeField, Range(0f, 1f)] private float pickupVolume = 0.9f;
     [SerializeField, Range(0f, 0.3f)] private float pickupPitchJitter = 0.06f;
     [SerializeField] private float pickupBasePitch = 1f;
 
-    private void Awake()
+    [Header("Rango")]
+    public float upgradedRadius = 1f;
+
+    private void Reset()
     {
         // Asegura collider + trigger
         var col = GetComponent<Collider>();
@@ -54,33 +58,27 @@ public class PowerUp : MonoBehaviour
         var player = other.GetComponent<PlayerController>() ?? other.GetComponentInParent<PlayerController>();
         if (player == null) return;
 
+        player.PlayPowerupPickupSfx();
+
         // Aplica efecto + UI
-        switch (kind)
+        switch (type)
         {
-            case PowerUpKind.FastSpeed:
+            case PowerUpType.MoreRange:
+                GameManager.Instance?.ActivateUpgradedRange(durationSeconds);
+                PowerupUIManager.Instance?.ActivateTimed(PowerUpType.MoreRange, durationSeconds);
+                break;
+            case PowerUpType.FastSpeed:
                 player.ApplySpeedMultiplier(durationSeconds, Mathf.Max(1.01f, speedMultiplier));
-                PowerupUIManager.Instance?.ActivateTimed(PowerupType.FastSpeed, durationSeconds);
+                PowerupUIManager.Instance?.ActivateTimed(PowerUpType.FastSpeed, durationSeconds);
                 break;
-
-            case PowerUpKind.SlowSpeed:
-                float slowMult = (speedMultiplier < 1f) ? Mathf.Clamp(speedMultiplier, 0.05f, 0.99f) : 0.5f;
-                player.ApplySpeedMultiplier(durationSeconds, slowMult);
-                PowerupUIManager.Instance?.ActivateTimed(PowerupType.SlowSpeed, durationSeconds);
+            case PowerUpType.StaminaRegen:
+                player.ApplyStaminaRegeneration(staminaRegenPerInterval, regenInterval, durationSeconds);
                 break;
-
-            case PowerUpKind.StaminaSlow:
-                player.ApplyStaminaDrainModifier(durationSeconds, staminaDrainFactor);
-                PowerupUIManager.Instance?.ActivateTimed(PowerupType.StaminaSlow, durationSeconds);
-                break;
-
-            case PowerUpKind.ExtraLife:
+            case PowerUpType.ExtraLife:
                 GameManager.Instance?.GrantExtraLife(1);
                 PowerupUIManager.Instance?.OnExtraLifeGained();
                 break;
         }
-
-        // SFX al recoger
-        PlayPickupSfx();
 
         // Destruye el pickup tras aplicarse
         Destroy(gameObject);
@@ -119,7 +117,7 @@ public class PowerUp : MonoBehaviour
         src.clip = commonPickupClip;
         src.Play();
 
-        // Colócala cerca de la cámara por si tu listener está allí
+        // Colï¿½cala cerca de la cï¿½mara por si tu listener estï¿½ allï¿½
         var cam = Camera.main;
         go.transform.position = cam ? cam.transform.position : Vector3.zero;
 
