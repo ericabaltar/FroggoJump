@@ -10,7 +10,7 @@ public class WebBall : MonoBehaviour
         {
             Debug.Log("Collisioned");
             Destroy(collision.transform.gameObject);
-            EditorApplication.ExitPlaymode();
+            //EditorApplication.ExitPlaymode();
             //SceneManager.LoadScene("Level1");
         }
     }
