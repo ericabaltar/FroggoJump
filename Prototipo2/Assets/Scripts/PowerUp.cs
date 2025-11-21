@@ -2,65 +2,127 @@ using UnityEngine;
 
 public enum PowerUpType
 {
-    MoreRange,         // Reducir velocidad del jugador
-    FastSpeed,         // Aumentar velocidad del jugador
-    StaminaRegen,      // La estamina se gasta más lento
-    ExtraLife          // Vida extra (uso único)
+    FastSpeed,     // Aumenta velocidad (duraciï¿½n)
+    MoreRange,     // Reduce velocidad (duraciï¿½n)
+    StaminaRegen,   // Estamina se gasta mï¿½s lento (duraciï¿½n)
+    ExtraLife      // Vida extra (enciende icono hasta consumir)
 }
 
 [RequireComponent(typeof(Collider))]
 public class PowerUp : MonoBehaviour
 {
     [Header("Tipo")]
-    public PowerUpType type = PowerUpType.FastSpeed;
+    public PowerUpType type = PowerUpType.ExtraLife;
 
-    [Header("Duración (si aplica)")]
-    public float duration = 6f;
+    [Header("Parï¿½metros comunes")]
+    [SerializeField] private float durationSeconds = 6f;   // para temporales
+    [SerializeField] private float pickupRadius = 0.6f;    // si no hay collider, se crea Sphere
 
-    [Header("Parámetros de velocidad")]
-    [Tooltip("Multiplicador de velocidad (>1 más rápido, <1 más lento). Se usa en Fast/Slow Speed")]
-    public float speedMultiplier = 1.5f;   // FastSpeed: 1.5, SlowSpeed: 0.6 por ejemplo
+    [Header("Velocidad")]
+    [SerializeField] private float speedMultiplier = 1.5f; // >1 acelera, <1 frena
 
-    [Header("Parámetros de estamina")]
+    [Header("Parï¿½metros de estamina")]
     public int staminaRegenPerInterval = 1;
     public float regenInterval = 0.5f;
 
-    [Header("Vidas")]
-    public int extraLives = 1;
+    // -------- SFX PICKUP (COMï¿½N) --------
+    [Header("SFX ï¿½nico para TODOS los powerups")]
+    [Tooltip("Mismo clip para todos los powerups. Arrï¿½stralo en cada prefab o configï¿½ralo por script.")]
+    [SerializeField] private AudioClip commonPickupClip;
+    [SerializeField, Range(0f, 1f)] private float pickupVolume = 0.9f;
+    [SerializeField, Range(0f, 0.3f)] private float pickupPitchJitter = 0.06f;
+    [SerializeField] private float pickupBasePitch = 1f;
 
     [Header("Rango")]
     public float upgradedRadius = 1f;
 
     private void Reset()
     {
+        // Asegura collider + trigger
         var col = GetComponent<Collider>();
+        if (col == null) col = gameObject.AddComponent<SphereCollider>();
         col.isTrigger = true;
-        if (gameObject.tag == "Untagged") gameObject.tag = "PowerUp";
+
+        if (col is SphereCollider sc)
+        {
+            if (sc.radius < 0.05f) sc.radius = pickupRadius;
+            sc.center = Vector3.zero;
+        }
+
+        if (CompareTag("Untagged")) gameObject.tag = "PowerUp";
     }
 
     private void OnTriggerEnter(Collider other)
     {
-        var player = other.GetComponent<PlayerController>();
+        // Intenta encontrar PlayerController en el propio objeto o en sus padres
+        var player = other.GetComponent<PlayerController>() ?? other.GetComponentInParent<PlayerController>();
         if (player == null) return;
 
+        player.PlayPowerupPickupSfx();
+
+        // Aplica efecto + UI
         switch (type)
         {
             case PowerUpType.MoreRange:
-                GameManager.Instance?.ActivateUpgradedRange(duration);
+                GameManager.Instance?.ActivateUpgradedRange(durationSeconds);
+                PowerupUIManager.Instance?.ActivateTimed(PowerUpType.MoreRange, durationSeconds);
                 break;
             case PowerUpType.FastSpeed:
-                player.ApplySpeedMultiplier(duration, Mathf.Max(0.05f, speedMultiplier));
+                player.ApplySpeedMultiplier(durationSeconds, Mathf.Max(1.01f, speedMultiplier));
+                PowerupUIManager.Instance?.ActivateTimed(PowerUpType.FastSpeed, durationSeconds);
                 break;
-
             case PowerUpType.StaminaRegen:
-                player.ApplyStaminaRegeneration(staminaRegenPerInterval, regenInterval, duration);
+                player.ApplyStaminaRegeneration(staminaRegenPerInterval, regenInterval, durationSeconds);
                 break;
-
             case PowerUpType.ExtraLife:
-                GameManager.Instance?.GrantExtraLife(extraLives);
+                GameManager.Instance?.GrantExtraLife(1);
+                PowerupUIManager.Instance?.OnExtraLifeGained();
                 break;
         }
 
+        // Destruye el pickup tras aplicarse
         Destroy(gameObject);
+    }
+
+    private void PlayPickupSfx()
+    {
+        if (commonPickupClip == null)
+        {
+            Debug.LogWarning($"[PowerUp] No hay commonPickupClip asignado en {name}. No se puede reproducir sonido.");
+            return;
+        }
+
+        // 1) Usa SfxManager si existe
+        if (SfxManager.Instance != null)
+        {
+            SfxManager.Instance.PlayOneShot(commonPickupClip, pickupVolume, pickupPitchJitter, pickupBasePitch);
+            // Debug opcional:
+            // Debug.Log("[PowerUp] SFX por SfxManager");
+            return;
+        }
+
+        // 2) Fallback local: crea un AudioSource temporal en escena
+        // (Esto asegura sonido aunque te hayas olvidado del manager)
+        var go = new GameObject("OneShot_SFX_PowerUp");
+        var src = go.AddComponent<AudioSource>();
+        src.playOnAwake = false;
+        src.loop = false;
+        src.spatialBlend = 0f; // 2D
+        src.volume = Mathf.Clamp01(pickupVolume);
+
+        // Pitch aleatorio:
+        float p = Mathf.Clamp(pickupBasePitch + Random.Range(-pickupPitchJitter, pickupPitchJitter), 0.1f, 3f);
+        src.pitch = p;
+
+        src.clip = commonPickupClip;
+        src.Play();
+
+        // Colï¿½cala cerca de la cï¿½mara por si tu listener estï¿½ allï¿½
+        var cam = Camera.main;
+        go.transform.position = cam ? cam.transform.position : Vector3.zero;
+
+        Object.Destroy(go, commonPickupClip.length / Mathf.Max(0.01f, p));
+        // Debug opcional:
+        // Debug.Log("[PowerUp] SFX por fallback local (sin SfxManager)");
     }
 }

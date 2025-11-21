@@ -14,8 +14,28 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private float inputBufferTime = 0.15f;
     [SerializeField] private float holdTime = 0.5f;
 
-    private enum InputType { Tap, Hold }
+    // -------- SFX PowerUp (común) --------
+    [Header("SFX PowerUp (común)")]
+    [SerializeField] private AudioClip powerupPickupClip;
+    [SerializeField, Range(0f, 1f)] private float powerupPickupVolume = 0.9f;
+    [SerializeField, Range(0f, 0.3f)] private float powerupPickupPitchJitter = 0.06f;
+    [SerializeField] private float powerupPickupBasePitch = 1f;
 
+    // -------- SFX Fly (moscas) --------
+    [Header("SFX Fly (al comer mosca)")]
+    [SerializeField] private AudioClip flyPickupClip;
+    [SerializeField, Range(0f, 1f)] private float flyPickupVolume = 0.9f;
+    [SerializeField, Range(0f, 0.3f)] private float flyPickupPitchJitter = 0.03f;
+    [SerializeField] private float flyPickupBasePitch = 1f;
+
+    // -------- Señales de movimiento para MovementSFX --------
+    public event System.Action OnJumpStart;
+    public event System.Action OnLanded;
+
+    [Header("(Opcional) Referencia directa al MovementSFX (no se usa para llamadas directas)")]
+    [SerializeField] private MovementSFX movementSFX;
+
+    private enum InputType { Tap, Hold }
     private Vector2Int bufferedInputDirection;
     private InputType bufferedInputType;
     private float bufferTimeLeft = 0f;
@@ -36,18 +56,15 @@ public class PlayerController : MonoBehaviour
     // Plataformas móviles
     private bool isOnMovingBase = false;
     private MovingBase currentMovingBase = null;
-
     private Transform defaultParent;
 
     // --------- POWERUPS / EFECTOS ---------
-    // Velocidad: moveDuration = original / speedMultiplier
     private float speedMultiplier = 1f;
     private float originalBaseMoveDuration;
     private Coroutine speedCoro;
 
-    // Estamina se gasta más lento (factor de 0.05 a 1). 0.5 = gasta la mitad
     private float staminaDrainMultiplier = 1f;
-    private float staminaResidue = 0f; // acumula gasto fraccional
+    private float staminaResidue = 0f;
     private Coroutine staminaCoro;
 
     bool canDie = true;
@@ -63,8 +80,9 @@ public class PlayerController : MonoBehaviour
 
         defaultParent = transform.parent;
 
-        if (HudManager.Instance != null)
-            HudManager.Instance.SetStaminaBar((float)currentStamina / maxStamina);
+        if (movementSFX == null) movementSFX = GetComponent<MovementSFX>();
+
+        HudManager.Instance?.SetStaminaBar((float)currentStamina / maxStamina);
     }
 
     void Update()
@@ -76,14 +94,14 @@ public class PlayerController : MonoBehaviour
             Vector2Int moveDirection = bufferedInputDirection;
             TurnCharacter(moveDirection);
 
-            // Distancia: Tap=1, Hold=2
             int tiles = (bufferedInputType == InputType.Tap) ? 1 : 2;
-
             Vector2Int destination = pos + moveDirection * tiles;
 
             if (GameManager.Instance.CheckIfAccessible(destination))
             {
-                animator.SetTrigger("JumpTrigger");
+                OnJumpStart?.Invoke();
+
+                if (animator) animator.SetTrigger("JumpTrigger");
                 StartCoroutine(MoveCharacter(destination));
             }
         }
@@ -96,12 +114,9 @@ public class PlayerController : MonoBehaviour
     {
         transform.localScale = Vector3.one;
 
-        // Gasto de estamina por salto (con multiplicador de gasto)
         DecreaseStamina(1);
-
         state = PlayerState.Moving;
 
-        // Soltar plataforma antes de saltar
         if (currentMovingBase != null)
             transform.SetParent(defaultParent, true);
 
@@ -135,11 +150,9 @@ public class PlayerController : MonoBehaviour
         transform.position = endPos;
         transform.localRotation = Quaternion.Euler(0f, startYaw, 0f);
 
-        // Actualiza grid y score
         pos = destination;
         GameManager.Instance.UpdateFarthestDistance(destination.y);
 
-        // Muerte en road si NO hay base estática y NO hay base móvil
         bool isRoadRow = GameManager.Instance.IsRoadRow(destination.y);
         if (canDie && isRoadRow && !GameManager.Instance.HasBaseAt(pos) && !isOnMovingBase)
         {
@@ -150,6 +163,8 @@ public class PlayerController : MonoBehaviour
         if (state == PlayerState.Moving)
         {
             state = PlayerState.Ready;
+
+            OnLanded?.Invoke();
 
             if (isOnMovingBase && currentMovingBase != null)
                 GetOnMovingPlatform(currentMovingBase);
@@ -237,7 +252,6 @@ public class PlayerController : MonoBehaviour
 
     private void Die()
     {
-        // Si tienes una vida extra, cancela la muerte
         if (GameManager.Instance != null && GameManager.Instance.TryConsumeExtraLife())
         {
             state = PlayerState.Ready;
@@ -248,20 +262,16 @@ public class PlayerController : MonoBehaviour
         if (state == PlayerState.Dead) return;
         state = PlayerState.Dead;
 
-        // Asegura que no sigues “enganchado” a plataformas
         isOnMovingBase = false;
         currentMovingBase = null;
         transform.SetParent(defaultParent, true);
 
-        // Anula cualquier input pendiente y corutinas de movimiento
         bufferedInputDirection = Vector2Int.zero;
         StopAllCoroutines();
 
-        // (Opcional) desactivar colisiones mientras dura la transición
         var col = GetComponent<Collider>();
         if (col) col.enabled = false;
 
-        // Lanza la transición de foco (si no está en escena, fallback a log)
         var spotlight = DeathSpotlightController.Instance;
         if (spotlight != null)
         {
@@ -274,16 +284,26 @@ public class PlayerController : MonoBehaviour
         }
     }
 
-    // Callback al terminar la animación del foco
     private void OnDeathFocusComplete()
     {
-        // Aquí decides qué hacer: game over, respawn, recargar escena, etc.
-        // Ejemplos:
-        // UnityEngine.SceneManagement.SceneManager.LoadScene("GameOver");
-        // o GameManager.Instance.ShowGameOver();
-        Debug.Log("Fin de transición de muerte.");
-    }
+        // Score final (usa el que tengas disponible)
+        int finalScore = 0;
+        if (GameManager.Instance != null)
+        {
+            // Si tienes un método de score mostrado, úsalo; si no, la distancia:
+            finalScore = GameManager.Instance.GetFarthestDistance();
+        }
 
+        // Muestra la UI de Game Over (pausa se hace dentro del manager)
+        if (GameOverUIManager.Instance != null)
+        {
+            GameOverUIManager.Instance.Show(finalScore);
+        }
+        else
+        {
+            Debug.LogWarning("GameOverUIManager no encontrado en la escena.");
+        }
+    }
 
     void TurnCharacter(Vector2Int moveDirection)
     {
@@ -296,8 +316,7 @@ public class PlayerController : MonoBehaviour
     private void SetStamina(int value)
     {
         currentStamina = Mathf.Clamp(value, 0, maxStamina);
-        if (HudManager.Instance != null)
-            HudManager.Instance.SetStaminaBar((float)currentStamina / maxStamina);
+        HudManager.Instance?.SetStaminaBar((float)currentStamina / maxStamina);
 
         if (currentStamina == 0)
             ChangeMovementSpeed(MovementSpeed.Slow);
@@ -312,21 +331,19 @@ public class PlayerController : MonoBehaviour
         if (newMovementSpeed == MovementSpeed.Slow)
         {
             currentMoveDuration = slowMoveDuration;
-            animator.SetFloat("JumpSpeedMult", 0.2f);
+            if (animator) animator.SetFloat("JumpSpeedMult", 0.2f);
         }
         else
         {
             currentMoveDuration = baseMoveDuration;
-            animator.SetFloat("JumpSpeedMult", 1f);
+            if (animator) animator.SetFloat("JumpSpeedMult", 1f);
         }
 
         currentMovementSpeed = newMovementSpeed;
-
     }
 
     private void DecreaseStamina(int baseCost)
     {
-        // Aplica multiplicador de gasto y acumula residuo fraccional
         float effective = baseCost * Mathf.Max(0.05f, staminaDrainMultiplier);
         staminaResidue += effective;
 
@@ -352,7 +369,7 @@ public class PlayerController : MonoBehaviour
         transform.position = currentMovingBase.transform.position;
     }
 
-    // --- Triggers: Fly y MovingBase ---
+    // --- Triggers: Fly / MovingBase / PowerUp ---
     private void OnTriggerEnter(Collider other)
     {
         if (other.CompareTag("Fly"))
@@ -360,9 +377,14 @@ public class PlayerController : MonoBehaviour
             var fly = other.GetComponent<Fly>();
             int amount = (fly != null) ? fly.staminaAmount : 1;
             AddStamina(amount);
+
+            PlayFlyPickupSfx();
+
             Destroy(other.gameObject);
+            return;
         }
-        else if (!isOnMovingBase && other.CompareTag("MovingBase"))
+
+        if (!isOnMovingBase && other.CompareTag("MovingBase"))
         {
             isOnMovingBase = true;
             currentMovingBase = other.GetComponent<MovingBase>();
@@ -370,6 +392,39 @@ public class PlayerController : MonoBehaviour
             if (state == PlayerState.Ready && currentMovingBase != null)
                 GetOnMovingPlatform(currentMovingBase);
         }
+    }
+
+    // ================== SFX PICKUPS ==================
+    public void PlayPowerupPickupSfx()
+    {
+        if (powerupPickupClip == null) return;
+
+        float pitch = Mathf.Clamp(powerupPickupBasePitch + Random.Range(-powerupPickupPitchJitter, powerupPickupPitchJitter), 0.1f, 3f);
+
+        if (SfxManager.Instance != null)
+        {
+            SfxManager.Instance.PlayOneShot(powerupPickupClip, powerupPickupVolume, powerupPickupPitchJitter, powerupPickupBasePitch);
+            return;
+        }
+
+        var pos = Camera.main ? Camera.main.transform.position : transform.position;
+        AudioSource.PlayClipAtPoint(powerupPickupClip, pos, powerupPickupVolume);
+    }
+
+    private void PlayFlyPickupSfx()
+    {
+        if (flyPickupClip == null) return;
+
+        float pitch = Mathf.Clamp(flyPickupBasePitch + Random.Range(-flyPickupPitchJitter, flyPickupPitchJitter), 0.1f, 3f);
+
+        if (SfxManager.Instance != null)
+        {
+            SfxManager.Instance.PlayOneShot(flyPickupClip, flyPickupVolume, flyPickupPitchJitter, flyPickupBasePitch);
+            return;
+        }
+
+        var pos = Camera.main ? Camera.main.transform.position : transform.position;
+        AudioSource.PlayClipAtPoint(flyPickupClip, pos, flyPickupVolume);
     }
 
     private void OnTriggerExit(Collider other)
@@ -385,10 +440,7 @@ public class PlayerController : MonoBehaviour
         }
     }
 
-    // ================== MÉTODOS PARA POWERUPS ==================
-
-    // Cambia la velocidad durante un tiempo: moveDuration = original / multiplier
-    // multiplier > 1 acelera; multiplier < 1 desacelera
+    // ====== MÉTODOS POWERUPS ======
     public void ApplySpeedMultiplier(float duration, float multiplier)
     {
         canDie = false;
