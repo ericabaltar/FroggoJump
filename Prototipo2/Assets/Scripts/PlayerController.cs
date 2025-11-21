@@ -69,6 +69,9 @@ public class PlayerController : MonoBehaviour
 
     bool canDie = true;
 
+    Vector2Int lastSafeLocation = Vector2Int.zero;
+    MovingBase lastSafeLocationBase = null;
+
     void Start()
     {
         pos = new Vector2Int(0, 0);
@@ -154,10 +157,22 @@ public class PlayerController : MonoBehaviour
         GameManager.Instance.UpdateFarthestDistance(destination.y);
 
         bool isRoadRow = GameManager.Instance.IsRoadRow(destination.y);
-        if (canDie && isRoadRow && !GameManager.Instance.HasBaseAt(pos) && !isOnMovingBase)
+        if (isRoadRow && !GameManager.Instance.HasBaseAt(pos) && !isOnMovingBase)
         {
-            Die();
-            yield break;
+            if (canDie)
+            {
+                Die();
+                yield break;
+            }
+        }
+        else
+        {
+            if (isOnMovingBase)
+                lastSafeLocationBase = currentMovingBase;
+            else
+                lastSafeLocationBase = null;
+
+            lastSafeLocation = pos;
         }
 
         if (state == PlayerState.Moving)
@@ -254,8 +269,7 @@ public class PlayerController : MonoBehaviour
     {
         if (GameManager.Instance != null && GameManager.Instance.TryConsumeExtraLife())
         {
-            state = PlayerState.Ready;
-            transform.SetParent(defaultParent, true);
+            Respawn();
             return;
         }
 
@@ -282,6 +296,25 @@ public class PlayerController : MonoBehaviour
             Debug.Log("Has muerto. (DeathSpotlightController no encontrado)");
             OnDeathFocusComplete();
         }
+    }
+
+    private void Respawn()
+    {
+        pos = lastSafeLocation;
+
+        if (lastSafeLocationBase != null)
+        {
+            Debug.Log("Intentando subirse a " + lastSafeLocationBase.gameObject.name);
+            GetOnMovingPlatform(lastSafeLocationBase);
+        }
+        else
+        {
+            float yHeight = GameManager.Instance.GetTerrainHeight(pos.y);
+            transform.position = new Vector3(pos.x, yHeight, pos.y);
+            transform.SetParent(defaultParent, true);
+        }
+
+        state = PlayerState.Ready;
     }
 
     private void OnDeathFocusComplete()
@@ -365,6 +398,7 @@ public class PlayerController : MonoBehaviour
     {
         isOnMovingBase = true;
         currentMovingBase = movingBase;
+        Debug.Log("Moving base: " + movingBase.name);
         transform.SetParent(currentMovingBase.transform, true);
         transform.position = currentMovingBase.transform.position;
     }
