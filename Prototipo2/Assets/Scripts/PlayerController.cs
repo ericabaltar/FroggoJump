@@ -190,10 +190,10 @@ public class PlayerController : MonoBehaviour
 
     private void HandleInput()
     {
-        DetectDirectionalInput(Keyboard.current.upArrowKey, Vector2Int.up);
-        DetectDirectionalInput(Keyboard.current.downArrowKey, Vector2Int.down);
-        DetectDirectionalInput(Keyboard.current.leftArrowKey, Vector2Int.left);
-        DetectDirectionalInput(Keyboard.current.rightArrowKey, Vector2Int.right);
+        DetectDirectionalInput(Keyboard.current.upArrowKey, Keyboard.current.wKey, Vector2Int.up);
+        DetectDirectionalInput(Keyboard.current.downArrowKey, Keyboard.current.sKey, Vector2Int.down);
+        DetectDirectionalInput(Keyboard.current.leftArrowKey, Keyboard.current.aKey, Vector2Int.left);
+        DetectDirectionalInput(Keyboard.current.rightArrowKey, Keyboard.current.dKey, Vector2Int.right);
 
         if (bufferTimeLeft > 0f)
         {
@@ -210,11 +210,11 @@ public class PlayerController : MonoBehaviour
         bufferTimeLeft = inputBufferTime;
     }
 
-    void DetectDirectionalInput(KeyControl key, Vector2Int direction)
+    void DetectDirectionalInput(KeyControl key, KeyControl key2, Vector2Int direction)
     {
-        if (key == null) return;
+        if (key == null && key2 == null) return;
 
-        if (key.wasPressedThisFrame)
+        if (key.wasPressedThisFrame || key2.wasPressedThisFrame)
         {
             inputHeldTimes[key.keyCode] = new InputInfo { timeHeld = 0f, direction = direction };
 
@@ -251,7 +251,7 @@ public class PlayerController : MonoBehaviour
                 transform.localScale = new Vector3(1f, vibrate, 1f);
             }
 
-            if (key.wasReleasedThisFrame)
+            if (key.wasReleasedThisFrame || key2.wasReleasedThisFrame)
             {
                 inputHeldTimes.Clear();
 
