@@ -117,8 +117,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8d9fe33d8935ca24583cb635960f734d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  sphereCollider: {fileID: -4936944586666814186}
   staminaAmount: 3
-  pickupRadius: 0.8
+  regularPickupRadius: 0.2
+  upgradedPickupRadius: 1
   bob: 1
   bobAmplitude: 0.1
   bobSpeed: 2
